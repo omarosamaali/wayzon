@@ -1,0 +1,1099 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Wayzon — أتمتة متجرك على سلة</title>
+  <meta name="description" content="Wayzon تساعد أصحاب متاجر سلة على أتمتة العمليات وزيادة المبيعات بأدوات SaaS احترافية." />
+  <link rel="icon" type="image/jpeg" href="new-fav.jpeg" />
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    /* ===========================
+       Hero
+       =========================== */
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      padding-top: 68px;
+      position: relative;
+      overflow: hidden;
+    }
+    .hero-bg {
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 80% 60% at 50% -20%, rgba(99,102,241,0.18) 0%, transparent 70%),
+        radial-gradient(ellipse 60% 40% at 90% 50%, rgba(139,92,246,0.1) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 40% at 10% 80%, rgba(6,182,212,0.07) 0%, transparent 60%);
+      pointer-events: none;
+    }
+    .hero-grid-lines {
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+      background-size: 60px 60px;
+      mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 40%, transparent 100%);
+      pointer-events: none;
+    }
+
+    .hero-content {
+      position: relative;
+      z-index: 1;
+      max-width: 780px;
+      margin: 0 auto;
+      text-align: center;
+      padding: 80px 0;
+    }
+
+    .hero-eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 16px 5px 8px;
+      background: rgba(99,102,241,0.1);
+      border: 1px solid rgba(99,102,241,0.2);
+      border-radius: 99px;
+      font-size: 0.8125rem;
+      font-weight: 600;
+      color: var(--primary-light);
+      margin-bottom: 28px;
+      cursor: pointer;
+      transition: var(--transition);
+    }
+    .hero-eyebrow:hover { background: rgba(99,102,241,0.18); }
+    .hero-eyebrow .dot {
+      width: 6px; height: 6px;
+      background: var(--primary);
+      border-radius: 50%;
+      animation: pulse-glow 2s ease-in-out infinite;
+    }
+    .hero-eyebrow .arrow { font-size: 0.75rem; opacity: 0.7; }
+
+    .hero-title {
+      font-size: clamp(2.2rem, 6vw, 4rem);
+      font-weight: 900;
+      line-height: 1.1;
+      color: var(--text-1);
+      margin-bottom: 24px;
+      letter-spacing: -0.02em;
+    }
+    .hero-title .line2 {
+      background: linear-gradient(135deg, #818cf8 0%, #a78bfa 50%, #38bdf8 100%);
+      background-size: 200% 200%;
+      animation: gradientShift 4s ease infinite;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .hero-subtitle {
+      font-size: 1.125rem;
+      color: var(--text-2);
+      line-height: 1.75;
+      margin-bottom: 40px;
+      max-width: 560px;
+      margin-inline: auto;
+    }
+
+    .hero-actions {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 56px;
+    }
+
+    .hero-social-proof {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      font-size: 0.875rem;
+      color: var(--text-3);
+    }
+    .hero-avatars {
+      display: flex;
+    }
+    .hero-avatars span {
+      width: 30px; height: 30px;
+      border-radius: 50%;
+      border: 2px solid var(--bg-primary);
+      background: linear-gradient(135deg, var(--primary), var(--secondary));
+      margin-inline-start: -8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.65rem;
+      font-weight: 700;
+      color: #fff;
+    }
+    .hero-avatars span:first-child { margin-inline-start: 0; }
+    .stars { color: #fbbf24; letter-spacing: 1px; }
+
+    /* ===========================
+       Hero Mockup
+       =========================== */
+    .hero-mockup {
+      position: relative;
+      max-width: 900px;
+      margin: 0 auto;
+      animation: fadeInUp 0.8s ease 0.3s both;
+    }
+    .mockup-browser {
+      background: var(--bg-card);
+      border: 1px solid var(--border-strong);
+      border-radius: var(--r-xl);
+      overflow: hidden;
+      box-shadow: 0 32px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.05);
+    }
+    .mockup-bar {
+      height: 44px;
+      background: var(--bg-card-2);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      gap: 8px;
+    }
+    .mockup-dot {
+      width: 12px; height: 12px;
+      border-radius: 50%;
+    }
+    .mockup-dot.red   { background: #ef4444; }
+    .mockup-dot.yellow{ background: #f59e0b; }
+    .mockup-dot.green { background: #10b981; }
+    .mockup-url {
+      flex: 1;
+      max-width: 280px;
+      margin: 0 auto;
+      height: 24px;
+      background: rgba(255,255,255,0.05);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+      color: var(--text-3);
+    }
+    .mockup-body {
+      padding: 24px;
+      display: grid;
+      grid-template-columns: 200px 1fr;
+      gap: 16px;
+      min-height: 320px;
+    }
+
+    /* sidebar */
+    .mockup-sidebar {
+      background: rgba(0,0,0,0.2);
+      border-radius: 10px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .mockup-nav-item {
+      height: 32px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      padding: 0 10px;
+      gap: 8px;
+      font-size: 0.75rem;
+      color: var(--text-3);
+    }
+    .mockup-nav-item.active {
+      background: rgba(99,102,241,0.2);
+      color: var(--primary-light);
+    }
+    .mockup-nav-item .icon {
+      width: 14px; height: 14px;
+      border-radius: 3px;
+      background: currentColor;
+      opacity: 0.5;
+    }
+    .mockup-nav-dot {
+      width: 4px; height: 4px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    /* content */
+    .mockup-content { display: flex; flex-direction: column; gap: 12px; }
+    .mockup-stat-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+    .mockup-stat {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+    }
+    .mockup-stat-label {
+      width: 60%; height: 6px;
+      background: rgba(255,255,255,0.08);
+      border-radius: 3px;
+      margin-bottom: 8px;
+    }
+    .mockup-stat-value {
+      width: 40%; height: 18px;
+      background: rgba(99,102,241,0.3);
+      border-radius: 4px;
+    }
+    .mockup-chart {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      height: 120px;
+      display: flex;
+      align-items: flex-end;
+      gap: 6px;
+    }
+    .mockup-bar-item {
+      flex: 1;
+      border-radius: 4px 4px 0 0;
+      background: linear-gradient(180deg, var(--primary) 0%, rgba(99,102,241,0.3) 100%);
+    }
+    .mockup-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .mockup-mini-card {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      height: 60px;
+    }
+
+    .mockup-glow {
+      position: absolute;
+      bottom: -40px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 80%;
+      height: 80px;
+      background: var(--primary);
+      filter: blur(60px);
+      opacity: 0.15;
+      pointer-events: none;
+    }
+
+    /* ===========================
+       Logos Strip
+       =========================== */
+    .logos-strip {
+      padding: 40px 0;
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+    .logos-label {
+      text-align: center;
+      font-size: 0.8125rem;
+      color: var(--text-3);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      font-weight: 600;
+      margin-bottom: 24px;
+    }
+    .logos-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 40px;
+      flex-wrap: wrap;
+    }
+    .logo-pill {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 20px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      border-radius: 99px;
+      font-size: 0.875rem;
+      font-weight: 700;
+      color: var(--text-3);
+      transition: var(--transition);
+    }
+    .logo-pill:hover { color: var(--text-2); border-color: var(--border-strong); }
+    .logo-pill span { font-size: 1.1rem; }
+
+    /* ===========================
+       Features
+       =========================== */
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+    }
+    .feature-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--r-lg);
+      padding: 28px;
+      transition: var(--transition);
+      position: relative;
+      overflow: hidden;
+    }
+    .feature-card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, var(--primary-glow) 0%, transparent 60%);
+      opacity: 0;
+      transition: var(--transition);
+    }
+    .feature-card:hover::before { opacity: 1; }
+    .feature-card:hover {
+      border-color: rgba(99,102,241,0.3);
+      transform: translateY(-3px);
+      box-shadow: var(--shadow);
+    }
+
+    .feature-icon {
+      width: 52px; height: 52px;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      margin-bottom: 18px;
+      position: relative;
+    }
+    .fi-indigo { background: rgba(99,102,241,0.15); border: 1px solid rgba(99,102,241,0.25); }
+    .fi-purple { background: rgba(139,92,246,0.15); border: 1px solid rgba(139,92,246,0.25); }
+    .fi-cyan   { background: rgba(6,182,212,0.15);  border: 1px solid rgba(6,182,212,0.25); }
+    .fi-green  { background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.25); }
+    .fi-orange { background: rgba(245,158,11,0.15); border: 1px solid rgba(245,158,11,0.25); }
+    .fi-pink   { background: rgba(236,72,153,0.15); border: 1px solid rgba(236,72,153,0.25); }
+
+    .feature-card h3 {
+      font-size: 1.0625rem;
+      font-weight: 700;
+      color: var(--text-1);
+      margin-bottom: 10px;
+      position: relative;
+    }
+    .feature-card p {
+      font-size: 0.9rem;
+      color: var(--text-2);
+      line-height: 1.7;
+      position: relative;
+    }
+
+    /* Big feature card */
+    .feature-card-big {
+      grid-column: span 2;
+    }
+
+    /* ===========================
+       How It Works
+       =========================== */
+    .how-steps {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 24px;
+      position: relative;
+      margin-top: 56px;
+    }
+    .how-steps::before {
+      content: '';
+      position: absolute;
+      top: 40px;
+      inset-inline: 10%;
+      height: 1px;
+      background: linear-gradient(to left, transparent, var(--primary), transparent);
+    }
+    .how-step {
+      text-align: center;
+      position: relative;
+    }
+    .how-step-num {
+      width: 80px; height: 80px;
+      border-radius: 20px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-strong);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 20px;
+      font-size: 2rem;
+      position: relative;
+      transition: var(--transition);
+    }
+    .how-step:hover .how-step-num {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 4px rgba(99,102,241,0.1);
+    }
+    .step-badge {
+      position: absolute;
+      top: -8px;
+      inset-inline-end: -8px;
+      width: 22px; height: 22px;
+      background: var(--primary);
+      border-radius: 50%;
+      border: 2px solid var(--bg-primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.625rem;
+      font-weight: 800;
+      color: #fff;
+    }
+    .how-step h3 {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--text-1);
+      margin-bottom: 8px;
+    }
+    .how-step p {
+      font-size: 0.875rem;
+      color: var(--text-2);
+      line-height: 1.6;
+    }
+
+    /* ===========================
+       Stats
+       =========================== */
+    .stats-section {
+      background: var(--bg-secondary);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0;
+    }
+    .stat-item {
+      padding: 48px 32px;
+      text-align: center;
+      border-inline-start: 1px solid var(--border);
+    }
+    .stat-item:first-child { border-inline-start: none; }
+    .stat-num {
+      font-size: 2.5rem;
+      font-weight: 900;
+      color: var(--text-1);
+      line-height: 1;
+      margin-bottom: 8px;
+    }
+    .stat-num span { color: var(--primary-light); }
+    .stat-label {
+      font-size: 0.9rem;
+      color: var(--text-2);
+      font-weight: 500;
+    }
+
+    /* ===========================
+       Testimonials
+       =========================== */
+    .testimonials-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+      margin-top: 56px;
+    }
+    .testimonial-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--r-lg);
+      padding: 28px;
+      transition: var(--transition);
+    }
+    .testimonial-card:hover {
+      border-color: var(--border-strong);
+      transform: translateY(-3px);
+      box-shadow: var(--shadow);
+    }
+    .testimonial-stars { color: #fbbf24; margin-bottom: 16px; font-size: 0.875rem; }
+    .testimonial-text {
+      font-size: 0.9375rem;
+      color: var(--text-2);
+      line-height: 1.75;
+      margin-bottom: 24px;
+    }
+    .testimonial-author {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .author-avatar {
+      width: 42px; height: 42px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, var(--primary), var(--secondary));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.1rem;
+      font-weight: 800;
+      color: #fff;
+      flex-shrink: 0;
+    }
+    .author-name { font-size: 0.9375rem; font-weight: 700; color: var(--text-1); }
+    .author-title { font-size: 0.8125rem; color: var(--text-3); }
+
+    /* ===========================
+       CTA Section
+       =========================== */
+    .cta-section {
+      text-align: center;
+      padding: 96px 0;
+    }
+    .cta-box {
+      background: linear-gradient(135deg, rgba(99,102,241,0.12) 0%, rgba(139,92,246,0.08) 100%);
+      border: 1px solid rgba(99,102,241,0.2);
+      border-radius: 28px;
+      padding: 72px 48px;
+      position: relative;
+      overflow: hidden;
+    }
+    .cta-box::before {
+      content: '';
+      position: absolute;
+      top: -60px; left: 50%; transform: translateX(-50%);
+      width: 300px; height: 300px;
+      background: radial-gradient(circle, rgba(99,102,241,0.2) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .cta-box h2 {
+      font-size: clamp(1.75rem, 4vw, 2.75rem);
+      font-weight: 900;
+      color: var(--text-1);
+      margin-bottom: 16px;
+      position: relative;
+    }
+    .cta-box p {
+      font-size: 1.0625rem;
+      color: var(--text-2);
+      max-width: 480px;
+      margin: 0 auto 36px;
+      line-height: 1.7;
+      position: relative;
+    }
+    .cta-actions {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      position: relative;
+    }
+    .cta-note {
+      margin-top: 16px;
+      font-size: 0.8125rem;
+      color: var(--text-3);
+      position: relative;
+    }
+
+    /* ===========================
+       Responsive
+       =========================== */
+    @media (max-width: 1024px) {
+      .features-grid { grid-template-columns: repeat(2, 1fr); }
+      .feature-card-big { grid-column: span 1; }
+      .how-steps { grid-template-columns: repeat(2, 1fr); }
+      .how-steps::before { display: none; }
+      .testimonials-grid { grid-template-columns: repeat(2, 1fr); }
+      .stats-grid { grid-template-columns: repeat(2, 1fr); }
+      .stat-item { border-bottom: 1px solid var(--border); }
+    }
+    @media (max-width: 768px) {
+      .features-grid { grid-template-columns: 1fr; }
+      .how-steps { grid-template-columns: 1fr; }
+      .testimonials-grid { grid-template-columns: 1fr; }
+      .stats-grid { grid-template-columns: 1fr 1fr; }
+      .mockup-body { grid-template-columns: 1fr; }
+      .mockup-sidebar { display: none; }
+      .mockup-stat-row { grid-template-columns: repeat(2, 1fr); }
+      .hero-content { padding: 48px 0; }
+      .cta-box { padding: 48px 24px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ======================== NAVBAR ======================== -->
+  <nav class="navbar" id="navbar">
+    <div class="navbar-inner">
+      <a href="index.html" class="logo">
+        <img src="logo.png" alt="Wayzon" class="logo-img" />
+        Wayzon
+      </a>
+      <div class="nav-links">
+        <a href="#features">المميزات</a>
+        <a href="#how">كيف يعمل</a>
+        <a href="pricing.html">الأسعار</a>
+        <a href="#testimonials">آراء العملاء</a>
+      </div>
+      <div class="nav-cta">
+        <a href="login.html" class="btn btn-ghost">تسجيل الدخول</a>
+        <a href="register.html" class="btn btn-primary">ابدأ مجاناً ←</a>
+      </div>
+      <button class="nav-mobile-toggle" id="mobileToggle" aria-label="القائمة">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+
+    <!-- Mobile Menu Drawer -->
+    <div class="mobile-menu" id="mobileMenu">
+      <div class="mobile-menu-inner">
+        <a href="#features"      class="mobile-nav-link" onclick="closeMobileMenu()">المميزات</a>
+        <a href="#how"           class="mobile-nav-link" onclick="closeMobileMenu()">كيف يعمل</a>
+        <a href="pricing.html"   class="mobile-nav-link" onclick="closeMobileMenu()">الأسعار</a>
+        <a href="#testimonials"  class="mobile-nav-link" onclick="closeMobileMenu()">آراء العملاء</a>
+        <div class="mobile-menu-divider"></div>
+        <a href="login.html"    class="mobile-nav-link" onclick="closeMobileMenu()">تسجيل الدخول</a>
+        <a href="register.html" class="btn btn-primary w-full" style="justify-content:center; margin-top:4px;" onclick="closeMobileMenu()">ابدأ مجاناً ←</a>
+      </div>
+    </div>
+    <div class="mobile-overlay" id="mobileOverlay" onclick="closeMobileMenu()"></div>
+  </nav>
+
+  <!-- ======================== HERO ======================== -->
+  <section class="hero">
+    <div class="hero-bg"></div>
+    <div class="hero-grid-lines"></div>
+    <div class="container">
+      <div class="hero-content animate-fadeInUp">
+
+        <div class="hero-eyebrow">
+          <span class="dot"></span>
+          الآن متوفر على سلة Apps
+          <span class="arrow">←</span>
+        </div>
+
+        <h1 class="hero-title">
+          أتمتة متجرك على سلة<br>
+          <span class="line2">بذكاء وسرعة</span>
+        </h1>
+
+        <p class="hero-subtitle">
+          Wayzon منصة SaaS متخصصة لأصحاب متاجر سلة — أدِر طلباتك، تواصل مع عملاءك عبر واتساب،
+          وحلّل مبيعاتك كلها من مكان واحد.
+        </p>
+
+        <div class="hero-actions">
+          <a href="register.html" class="btn btn-primary btn-lg">
+            ابدأ تجربتك المجانية
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          </a>
+          <a href="dashboard.html" class="btn btn-secondary btn-lg">
+            شاهد لوحة التحكم
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          </a>
+        </div>
+
+        <div class="hero-social-proof">
+          <div class="hero-avatars">
+            <span>أ</span><span>م</span><span>ف</span><span>س</span><span>خ</span>
+          </div>
+          <span>+500 متجر نشط</span>
+          <span>•</span>
+          <span class="stars">★★★★★</span>
+          <span>4.9/5 تقييم</span>
+        </div>
+      </div>
+
+      <!-- MOCKUP -->
+      <div class="hero-mockup" style="margin-top: 0;">
+        <div class="mockup-browser">
+          <div class="mockup-bar">
+            <div class="mockup-dot red"></div>
+            <div class="mockup-dot yellow"></div>
+            <div class="mockup-dot green"></div>
+            <div class="mockup-url">app.wayzon.sa/dashboard</div>
+          </div>
+          <div class="mockup-body">
+            <div class="mockup-sidebar">
+              <div class="mockup-nav-item active">
+                <div class="icon"></div> لوحة التحكم
+              </div>
+              <div class="mockup-nav-item">
+                <div class="icon"></div> الطلبات
+              </div>
+              <div class="mockup-nav-item">
+                <div class="icon"></div> العملاء
+              </div>
+              <div class="mockup-nav-item">
+                <div class="icon"></div> التقارير
+              </div>
+              <div class="mockup-nav-item">
+                <div class="icon"></div> واتساب
+              </div>
+              <div class="mockup-nav-item">
+                <div class="icon"></div> الإعدادات
+              </div>
+            </div>
+            <div class="mockup-content">
+              <div class="mockup-stat-row">
+                <div class="mockup-stat">
+                  <div class="mockup-stat-label"></div>
+                  <div class="mockup-stat-value"></div>
+                </div>
+                <div class="mockup-stat">
+                  <div class="mockup-stat-label"></div>
+                  <div class="mockup-stat-value" style="background:rgba(16,185,129,0.3)"></div>
+                </div>
+                <div class="mockup-stat">
+                  <div class="mockup-stat-label"></div>
+                  <div class="mockup-stat-value" style="background:rgba(6,182,212,0.3)"></div>
+                </div>
+              </div>
+              <div class="mockup-chart">
+                <div class="mockup-bar-item" style="height:40%"></div>
+                <div class="mockup-bar-item" style="height:65%"></div>
+                <div class="mockup-bar-item" style="height:50%"></div>
+                <div class="mockup-bar-item" style="height:80%"></div>
+                <div class="mockup-bar-item" style="height:60%"></div>
+                <div class="mockup-bar-item" style="height:90%"></div>
+                <div class="mockup-bar-item" style="height:70%"></div>
+                <div class="mockup-bar-item" style="height:85%"></div>
+              </div>
+              <div class="mockup-row">
+                <div class="mockup-mini-card"></div>
+                <div class="mockup-mini-card"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="mockup-glow"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======================== LOGOS ======================== -->
+  <div class="logos-strip">
+    <div class="container">
+      <p class="logos-label">يثق بنا أصحاب المتاجر في المملكة والخليج</p>
+      <div class="logos-row">
+        <div class="logo-pill"><span>🛍️</span> متجر الخليج</div>
+        <div class="logo-pill"><span>👗</span> فاشون ستور</div>
+        <div class="logo-pill"><span>💻</span> تقنية شوب</div>
+        <div class="logo-pill"><span>🌿</span> طبيعتي ستور</div>
+        <div class="logo-pill"><span>🎮</span> جيمرز مول</div>
+        <div class="logo-pill"><span>📱</span> موبايل بلس</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================== FEATURES ======================== -->
+  <section class="section" id="features">
+    <div class="container">
+      <div class="text-center" style="margin-bottom: 56px;">
+        <div class="section-tag">✦ المميزات</div>
+        <h2 class="section-title">كل ما تحتاجه لمتجرك<br><span class="gradient-text">في مكان واحد</span></h2>
+        <p class="section-subtitle">
+          من إدارة الطلبات إلى التسويق الآلي، Wayzon يغطي كل جانب من جوانب متجرك الإلكتروني.
+        </p>
+      </div>
+
+      <div class="features-grid">
+        <div class="feature-card feature-card-big card-glow">
+          <div class="feature-icon fi-indigo">🤖</div>
+          <h3>بوت واتساب ذكي</h3>
+          <p>تواصل تلقائي مع عملاءك عبر واتساب — تأكيد الطلبات، تتبع الشحن، والرد على الأسئلة الشائعة كلها بشكل آلي دون أي تدخل منك. وفّر وقتك وحسّن تجربة العملاء في نفس الوقت.</p>
+          <div style="margin-top: 20px; display: flex; gap: 8px; flex-wrap: wrap;">
+            <span class="badge badge-success">تلقائي 100%</span>
+            <span class="badge badge-primary">ذكاء اصطناعي</span>
+          </div>
+        </div>
+
+        <div class="feature-card card-glow">
+          <div class="feature-icon fi-purple">📊</div>
+          <h3>تقارير وتحليلات متقدمة</h3>
+          <p>تتبع مبيعاتك ونموك بتقارير بصرية مفصّلة. اعرف أفضل منتجاتك وأوقات ذروة المبيعات.</p>
+        </div>
+
+        <div class="feature-card card-glow">
+          <div class="feature-icon fi-cyan">⚡</div>
+          <h3>أتمتة الطلبات</h3>
+          <p>معالجة تلقائية للطلبات من اللحظة التي يؤكدها العميل حتى وصولها لباب منزله.</p>
+        </div>
+
+        <div class="feature-card card-glow">
+          <div class="feature-icon fi-green">💬</div>
+          <h3>إدارة العملاء CRM</h3>
+          <p>قاعدة بيانات متكاملة لعملاءك مع تاريخ المشتريات والتواصل لبناء علاقات أقوى.</p>
+        </div>
+
+        <div class="feature-card card-glow">
+          <div class="feature-icon fi-orange">🎯</div>
+          <h3>حملات تسويقية</h3>
+          <p>أرسل حملات واتساب وإيميل مخصصة لشرائح محددة من عملاءك لزيادة المبيعات.</p>
+        </div>
+
+        <div class="feature-card card-glow">
+          <div class="feature-icon fi-pink">🔗</div>
+          <h3>تكامل سلة API</h3>
+          <p>ربط فوري وتلقائي مع متجرك على سلة. لا حاجة لأي إعدادات معقدة.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======================== STATS ======================== -->
+  <div class="stats-section section-sm">
+    <div class="container">
+      <div class="stats-grid">
+        <div class="stat-item">
+          <div class="stat-num"><span>+</span>500</div>
+          <div class="stat-label">متجر نشط</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-num"><span>+</span>50K</div>
+          <div class="stat-label">طلب معالَج شهرياً</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-num">98<span>%</span></div>
+          <div class="stat-label">نسبة رضا العملاء</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-num"><span>×</span>3</div>
+          <div class="stat-label">متوسط نمو المبيعات</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================== HOW IT WORKS ======================== -->
+  <section class="section" id="how">
+    <div class="container">
+      <div class="text-center">
+        <div class="section-tag">⚙️ كيف يعمل</div>
+        <h2 class="section-title">ابدأ خلال <span class="gradient-text">5 دقائق فقط</span></h2>
+        <p class="section-subtitle">عملية بسيطة من 4 خطوات وأنت جاهز للعمل</p>
+      </div>
+
+      <div class="how-steps">
+        <div class="how-step">
+          <div class="how-step-num">
+            🔌
+            <span class="step-badge">1</span>
+          </div>
+          <h3>ربط المتجر</h3>
+          <p>أدخل بيانات متجرك على سلة وسيتم الربط التلقائي في ثوانٍ</p>
+        </div>
+        <div class="how-step">
+          <div class="how-step-num">
+            ⚙️
+            <span class="step-badge">2</span>
+          </div>
+          <h3>ضبط الإعدادات</h3>
+          <p>اختر الخدمات التي تريدها وخصّص رسائل واتساب حسب علامتك التجارية</p>
+        </div>
+        <div class="how-step">
+          <div class="how-step-num">
+            🚀
+            <span class="step-badge">3</span>
+          </div>
+          <h3>التشغيل الفوري</h3>
+          <p>شغّل الأتمتة بنقرة واحدة وابدأ بتلقي الطلبات فوراً</p>
+        </div>
+        <div class="how-step">
+          <div class="how-step-num">
+            📈
+            <span class="step-badge">4</span>
+          </div>
+          <h3>تتبع النمو</h3>
+          <p>راقب مبيعاتك وتفاعل العملاء من لوحة تحكم شاملة</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======================== TESTIMONIALS ======================== -->
+  <section class="section" id="testimonials" style="padding-top: 0;">
+    <div class="container">
+      <div class="text-center">
+        <div class="section-tag">⭐ آراء العملاء</div>
+        <h2 class="section-title">ماذا يقول <span class="gradient-text">أصحاب المتاجر</span></h2>
+        <p class="section-subtitle">تجارب حقيقية من متاجر نجحت مع Wayzon</p>
+      </div>
+
+      <div class="testimonials-grid">
+        <div class="testimonial-card">
+          <div class="testimonial-stars">★★★★★</div>
+          <p class="testimonial-text">
+            "Wayzon غيّر طريقة إدارتي للمتجر كلياً. الأتمتة وفّرت عليّ ساعات يومياً، والعملاء مبسوطين من سرعة الردود."
+          </p>
+          <div class="testimonial-author">
+            <div class="author-avatar">أ</div>
+            <div>
+              <div class="author-name">أحمد الشمري</div>
+              <div class="author-title">صاحب متجر إلكتروني — الرياض</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="testimonial-card">
+          <div class="testimonial-stars">★★★★★</div>
+          <p class="testimonial-text">
+            "التقارير التفصيلية ساعدتني أفهم عملاءي أكثر وأركز على المنتجات الأعلى مبيعاً. مبيعاتي زادت 40% خلال شهرين."
+          </p>
+          <div class="testimonial-author">
+            <div class="author-avatar" style="background: linear-gradient(135deg,#06b6d4,#6366f1)">س</div>
+            <div>
+              <div class="author-name">سارة القحطاني</div>
+              <div class="author-title">متجر عبايات — جدة</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="testimonial-card">
+          <div class="testimonial-stars">★★★★★</div>
+          <p class="testimonial-text">
+            "بوت الواتساب أفضل شيء! العملاء يسألون وهم يردون تلقائياً. الدعم الفني سريع ومتجاوب."
+          </p>
+          <div class="testimonial-author">
+            <div class="author-avatar" style="background: linear-gradient(135deg,#8b5cf6,#ec4899)">خ</div>
+            <div>
+              <div class="author-name">خالد العتيبي</div>
+              <div class="author-title">متجر إلكترونيات — الدمام</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======================== CTA ======================== -->
+  <section class="cta-section">
+    <div class="container">
+      <div class="cta-box">
+        <div class="section-tag" style="margin-bottom: 20px;">🎉 ابدأ الآن</div>
+        <h2>جاهز تطوّر متجرك؟</h2>
+        <p>انضم لأكثر من 500 متجر ناجح يستخدم Wayzon يومياً. تجربة مجانية 14 يوم بدون بطاقة ائتمان.</p>
+        <div class="cta-actions">
+          <a href="register.html" class="btn btn-primary btn-lg">
+            ابدأ مجاناً الآن
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          </a>
+          <a href="pricing.html" class="btn btn-secondary btn-lg">عرض الأسعار</a>
+        </div>
+        <p class="cta-note">✓ 14 يوم مجاناً &nbsp;•&nbsp; ✓ بدون بطاقة ائتمان &nbsp;•&nbsp; ✓ إلغاء في أي وقت</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======================== FOOTER ======================== -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <div class="logo">
+            <img src="logo.png" alt="Wayzon" class="logo-img" />
+            Wayzon
+          </div>
+          <p>منصة SaaS متخصصة لأصحاب متاجر سلة. أتمتة، تحليلات، وتواصل ذكي مع العملاء.</p>
+          <div class="footer-social" style="margin-top: 20px;">
+            <a href="#" title="تويتر">𝕏</a>
+            <a href="#" title="واتساب">W</a>
+            <a href="#" title="انستقرام">ig</a>
+            <a href="#" title="لينكدإن">in</a>
+          </div>
+        </div>
+        <div class="footer-col">
+          <h4>المنتج</h4>
+          <ul>
+            <li><a href="#features">المميزات</a></li>
+            <li><a href="pricing.html">الأسعار</a></li>
+            <li><a href="dashboard.html">لوحة التحكم</a></li>
+            <li><a href="#">التوثيق</a></li>
+            <li><a href="#">API</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>الشركة</h4>
+          <ul>
+            <li><a href="#">من نحن</a></li>
+            <li><a href="#">المدونة</a></li>
+            <li><a href="#">شراكات</a></li>
+            <li><a href="#">الوظائف</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>الدعم</h4>
+          <ul>
+            <li><a href="#">مركز المساعدة</a></li>
+            <li><a href="#">تواصل معنا</a></li>
+            <li><a href="#">سياسة الخصوصية</a></li>
+            <li><a href="#">الشروط والأحكام</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p>© 2025 Wayzon. جميع الحقوق محفوظة.</p>
+        <p>مصنوع بـ ❤️ للمتاجر السعودية</p>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    // Navbar scroll effect
+    const navbar = document.getElementById('navbar');
+    window.addEventListener('scroll', () => {
+      navbar.classList.toggle('scrolled', window.scrollY > 20);
+    });
+
+    // Mobile menu
+    const mobileToggle = document.getElementById('mobileToggle');
+    const mobileMenu   = document.getElementById('mobileMenu');
+    const mobileOverlay= document.getElementById('mobileOverlay');
+
+    function openMobileMenu() {
+      mobileToggle.classList.add('open');
+      mobileMenu.classList.add('open');
+      mobileOverlay.classList.add('open');
+      document.body.style.overflow = 'hidden';
+    }
+    function closeMobileMenu() {
+      mobileToggle.classList.remove('open');
+      mobileMenu.classList.remove('open');
+      mobileOverlay.classList.remove('open');
+      document.body.style.overflow = '';
+    }
+    mobileToggle.addEventListener('click', function() {
+      mobileMenu.classList.contains('open') ? closeMobileMenu() : openMobileMenu();
+    });
+
+    // Animated counters
+    const counters = document.querySelectorAll('.stat-num');
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          const el = entry.target;
+          const text = el.textContent;
+          const num = parseInt(text.replace(/\D/g, ''));
+          let current = 0;
+          const duration = 1500;
+          const step = num / (duration / 16);
+          const inner = el.querySelector('span');
+          const prefix = inner ? inner.textContent : '';
+          const suffix = text.replace(/[0-9+]/g, '').replace(prefix,'');
+          const timer = setInterval(() => {
+            current = Math.min(current + step, num);
+            const display = Math.floor(current);
+            el.textContent = (text.startsWith('+') ? '+' : (text.startsWith('×') ? '×' : ''))
+              + display
+              + (text.endsWith('%') ? '%' : '');
+            if (current >= num) clearInterval(timer);
+          }, 16);
+          observer.unobserve(el);
+        }
+      });
+    }, { threshold: 0.5 });
+    counters.forEach(c => observer.observe(c));
+  </script>
+</body>
+</html>
