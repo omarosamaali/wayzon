@@ -62,6 +62,7 @@ class BotConfigController extends Controller
             'store_name'          => 'nullable|string|max:200',
             'store_training'      => 'nullable|string|max:5000',
             'store_desc'          => 'nullable|string|max:1000',
+            'support_phone'       => 'nullable|string|max:20',
             'work_hours'          => 'nullable|string|max:300',
             'shipping_policy'     => 'nullable|string|max:500',
             'return_policy'       => 'nullable|string|max:500',
@@ -75,6 +76,10 @@ class BotConfigController extends Controller
             'faqs'                => 'nullable|array',
             'faqs.*.q'            => 'nullable|string|max:300',
             'faqs.*.a'            => 'nullable|string|max:500',
+            'msg_order_created'   => 'nullable|string|max:1000',
+            'msg_order_shipped'   => 'nullable|string|max:1000',
+            'msg_order_delivered' => 'nullable|string|max:1000',
+            'msg_order_canceled'  => 'nullable|string|max:1000',
         ]);
 
         Auth::user()->update(['bot_config' => $data]);

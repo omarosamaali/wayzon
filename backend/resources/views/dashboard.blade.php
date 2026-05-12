@@ -3580,6 +3580,18 @@
                 </div>
               </div>
 
+              <!-- Support phone -->
+              <div class="full-panel">
+                <div class="panel-head"><span class="panel-title">📞 رقم الدعم البشري</span></div>
+                <div style="padding:14px 20px;">
+                  <div class="wa-form-group">
+                    <label class="wa-label">رقم الواتساب للتحويل عند طلب الدعم</label>
+                    <input id="ai_support_phone" class="wa-input" type="text" placeholder="مثال: 966512345678 (بدون +)" />
+                    <div style="font-size:0.75rem;color:var(--t3);margin-top:6px;">عندما يطلب العميل التحدث مع موظف أو دعم بشري، سيرسل له البوت هذا الرقم تلقائياً.</div>
+                  </div>
+                </div>
+              </div>
+
               <!-- Behavior toggles -->
               <div class="full-panel">
                 <div class="panel-head"><span class="panel-title">⚙️ سلوك البوت</span></div>
@@ -3852,7 +3864,7 @@
                 <div style="padding:18px 20px;">
                   <div class="wa-form-group">
                     <label class="wa-label">نص الرسالة</label>
-                    <textarea class="wa-input wa-textarea">أهلاً @{{customer_name}} 👋
+                    <textarea id="msg_order_created" class="wa-input wa-textarea">أهلاً @{{customer_name}} 👋
 شكراً لطلبك من @{{store_name}}!
 رقم طلبك: @{{order_id}}
 المبلغ: @{{order_total}} ر.س
@@ -3875,7 +3887,7 @@
                 <div style="padding:18px 20px;">
                   <div class="wa-form-group">
                     <label class="wa-label">نص الرسالة</label>
-                    <textarea class="wa-input wa-textarea">مرحباً @{{customer_name}} 🚚
+                    <textarea id="msg_order_shipped" class="wa-input wa-textarea">مرحباً @{{customer_name}} 🚚
 طلبك رقم @{{order_id}} في الطريق إليك!
 شركة الشحن: @{{shipping_company}}
 رقم التتبع: @{{tracking_number}}
@@ -3898,7 +3910,7 @@
                 <div style="padding:18px 20px;">
                   <div class="wa-form-group">
                     <label class="wa-label">نص الرسالة</label>
-                    <textarea class="wa-input wa-textarea">أهلاً @{{customer_name}} 🎉
+                    <textarea id="msg_order_delivered" class="wa-input wa-textarea">أهلاً @{{customer_name}} 🎉
 وصل طلبك بنجاح!
 نتمنى أن تكون راضياً عن مشترياتك.
 يسعدنا تقييمك للمنتج ⭐</textarea>
@@ -3920,7 +3932,7 @@
                 <div style="padding:18px 20px;">
                   <div class="wa-form-group">
                     <label class="wa-label">نص الرسالة</label>
-                    <textarea class="wa-input wa-textarea">عزيزي @{{customer_name}}،
+                    <textarea id="msg_order_canceled" class="wa-input wa-textarea">عزيزي @{{customer_name}}،
 نأسف لإخبارك أن طلبك رقم @{{order_id}} تم إلغاؤه.
 للاستفسار تواصل معنا على: @{{store_phone}}</textarea>
                   </div>
@@ -4723,12 +4735,35 @@
       document.getElementById('previewModal').style.display = 'flex';
     }
 
-    function saveTemplates() {
+    async function saveTemplates() {
       const btn = event.target;
       const orig = btn.textContent;
-      btn.textContent = '✅ تم الحفظ!';
-      btn.style.background = 'var(--green)';
-      setTimeout(() => { btn.textContent = orig; btn.style.background = ''; }, 2000);
+      btn.textContent = '⏳ جارٍ الحفظ...';
+      btn.disabled = true;
+
+      const payload = {
+        msg_order_created:   document.getElementById('msg_order_created')?.value  || '',
+        msg_order_shipped:   document.getElementById('msg_order_shipped')?.value  || '',
+        msg_order_delivered: document.getElementById('msg_order_delivered')?.value || '',
+        msg_order_canceled:  document.getElementById('msg_order_canceled')?.value  || '',
+      };
+
+      try {
+        const res = await fetch('/bot-config', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+          },
+          body: JSON.stringify(payload),
+        });
+        btn.textContent = res.ok ? '✅ تم الحفظ!' : '❌ خطأ';
+        btn.style.background = res.ok ? 'var(--green)' : 'var(--red)';
+      } catch(e) {
+        btn.textContent = '❌ خطأ في الاتصال';
+        btn.style.background = 'var(--red)';
+      }
+      setTimeout(() => { btn.textContent = orig; btn.style.background = ''; btn.disabled = false; }, 2500);
     }
     function saveSection(n) { saveTemplates(); }
     function resetAllTemplates() {
@@ -4982,8 +5017,7 @@
       if (!cfg || !Object.keys(cfg).length) return;
       if (cfg.store_training)  document.getElementById('ai_store_training').value = cfg.store_training;
       if (cfg.store_desc && !cfg.store_training) document.getElementById('ai_store_training').value = cfg.store_desc;
-      // Legacy fields (hidden, kept for compat)
-      // if (cfg.work_hours) ...etc — replaced by store_training
+      if (cfg.support_phone)   document.getElementById('ai_support_phone').value = cfg.support_phone;
       if (cfg.reply_with_name  === false) document.getElementById('tog_reply_name')?.classList.replace('on','off');
       if (cfg.stop_on_manual   === false) document.getElementById('tog_stop_manual')?.classList.replace('on','off');
       if (cfg.link_products    === false) document.getElementById('tog_link_products')?.classList.replace('on','off');
@@ -4992,6 +5026,10 @@
         const sel = document.getElementById('manual_resume_after');
         if (sel) sel.value = String(cfg.manual_resume_after);
       }
+      if (cfg.msg_order_created)   document.getElementById('msg_order_created').value   = cfg.msg_order_created;
+      if (cfg.msg_order_shipped)   document.getElementById('msg_order_shipped').value   = cfg.msg_order_shipped;
+      if (cfg.msg_order_delivered) document.getElementById('msg_order_delivered').value = cfg.msg_order_delivered;
+      if (cfg.msg_order_canceled)  document.getElementById('msg_order_canceled').value  = cfg.msg_order_canceled;
     } catch(e) {}
   }
   loadBotConfig();
@@ -5031,13 +5069,14 @@
     btn.disabled = true;
 
     const payload = {
-      store_training:   document.getElementById('ai_store_training')?.value || '',
+      store_training:      document.getElementById('ai_store_training')?.value || '',
+      support_phone:       document.getElementById('ai_support_phone')?.value || '',
       reply_with_name:     document.getElementById('tog_reply_name')?.classList.contains('on'),
       stop_on_manual:      document.getElementById('tog_stop_manual')?.classList.contains('on'),
       manual_resume_after: parseInt(document.getElementById('manual_resume_after')?.value) || 30,
-      link_products:    document.getElementById('tog_link_products')?.classList.contains('on'),
-      multi_lang:       document.getElementById('tog_multi_lang')?.classList.contains('on'),
-      faqs:             collectFAQs(),
+      link_products:       document.getElementById('tog_link_products')?.classList.contains('on'),
+      multi_lang:          document.getElementById('tog_multi_lang')?.classList.contains('on'),
+      faqs:                collectFAQs(),
     };
 
     try {

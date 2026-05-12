@@ -145,8 +145,14 @@ class SallaWebhookController extends Controller
 
     private function sendWhatsApp(int $userId, Order $order): void
     {
-        $storeName = SallaStore::where('user_id', $userId)->value('store_name');
-        $message = $this->openAI->generate($order, $storeName) ?? $this->buildFallbackMessage($order);
+        $store     = SallaStore::where('user_id', $userId)->first();
+        $storeName = $store?->store_name ?? '';
+        $user      = User::find($userId);
+        $botConfig = $user?->bot_config ?? [];
+
+        $message = $this->buildTemplateMessage($order, $storeName, $botConfig)
+            ?? $this->openAI->generate($order, $storeName)
+            ?? $this->buildFallbackMessage($order);
 
         try {
             $ok = $this->whatsapp->send((string) $userId, (string) $order->customer_phone, $message);
@@ -156,6 +162,36 @@ class SallaWebhookController extends Controller
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error('WhatsApp send failed: ' . $e->getMessage());
         }
+    }
+
+    private function buildTemplateMessage(Order $order, string $storeName, array $cfg): ?string
+    {
+        $statusTemplateMap = [
+            'new'               => 'msg_order_created',
+            'in_progress'       => 'msg_order_created',
+            'paid'              => 'msg_order_created',
+            'payment_confirmed' => 'msg_order_created',
+            'shipped'           => 'msg_order_shipped',
+            'delivering'        => 'msg_order_shipped',
+            'out_for_delivery'  => 'msg_order_shipped',
+            'delivered'         => 'msg_order_delivered',
+            'canceled'          => 'msg_order_canceled',
+        ];
+
+        $key      = $statusTemplateMap[$order->status] ?? null;
+        $template = $key ? ($cfg[$key] ?? null) : null;
+
+        if (!$template) return null;
+
+        $vars = [
+            '@{{customer_name}}' => $order->customer_name ?? 'عزيزي العميل',
+            '@{{store_name}}'    => $storeName,
+            '@{{order_id}}'      => $order->reference_id ?: $order->salla_order_id,
+            '@{{order_total}}'   => $order->total,
+            '@{{store_phone}}'   => $cfg['support_phone'] ?? '',
+        ];
+
+        return str_replace(array_keys($vars), array_values($vars), $template);
     }
 
     private function handleSubscriptionCreated(array $data): void

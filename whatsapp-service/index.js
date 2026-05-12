@@ -292,11 +292,11 @@ async function handleIncomingMessage(tenantId, sock, msg) {
         }
     }
 
-    // ── 2. Product search — no AI needed ──
+    // ── 2. Product search — skip if merchant has custom training (AI handles it) ──
     const productKeywords = ['سعر', 'بكم', 'بكام', 'منتج', 'متوفر', 'يتوفر', 'موجود', 'أسعار', 'اسعار'];
     const isProductQuery  = productKeywords.some(k => text.includes(k));
 
-    if (isProductQuery) {
+    if (isProductQuery && !c.store_training) {
         const searchTerm = text.replace(/[؟?!،,]/g, '').trim();
         const data = await lookupProduct(tenantId, searchTerm);
         if (data.found && data.products?.length) {
@@ -363,7 +363,19 @@ async function handleIncomingMessage(tenantId, sock, msg) {
         return;
     }
 
-    // ── 3. AI for general questions only ──
+    // ── 3. Support transfer ──
+    const supportKeywords = ['موظف', 'بشري', 'إنسان', 'انسان', 'دعم', 'مسؤول', 'حولني', 'تحويل', 'تكلم', 'اتصل', 'تواصل مع'];
+    const isSupportRequest = supportKeywords.some(k => text.includes(k));
+    if (isSupportRequest && c.support_phone) {
+        const reply = `للتواصل مع فريق الدعم مباشرة 👇\nwa.me/${c.support_phone}`;
+        const sent = await sock.sendMessage(replyJid, { text: reply });
+        if (sent?.key?.id) { botSentIds.add(sent.key.id); setTimeout(() => botSentIds.delete(sent.key.id), 15000); }
+        addToHistory(tenantId, phone, 'user', text);
+        addToHistory(tenantId, phone, 'assistant', reply);
+        return;
+    }
+
+    // ── 4. AI for general questions only ──
     const activePlans = ['pro', 'growth', 'trial', 'smart', 'basic'];
     if (!activePlans.includes(botCfg.plan)) {
         console.log(`[${tenantId}] plan=${botCfg.plan} — AI skipped`);
