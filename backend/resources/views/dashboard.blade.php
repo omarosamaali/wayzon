@@ -2663,111 +2663,30 @@
           <div class="page-header">
             <div>
               <div class="page-h1">🛍️ المنتجات</div>
-              <div class="page-sub">86 منتج نشط · يتجدد يومياً</div>
+              <div class="page-sub" id="products-sub">جاري تحميل المنتجات...</div>
             </div>
             <div style="display:flex;gap:8px;">
-              <button class="btn btn-ghost btn-sm">📥 استيراد</button>
-              <button class="btn btn-primary btn-sm">+ منتج جديد</button>
+              <button class="btn btn-ghost btn-sm" onclick="loadProducts(1)">🔄 تحديث</button>
             </div>
           </div>
 
-          <div class="filter-bar">
-            <button class="filter-tab active">الكل (86)</button>
-            <button class="filter-tab">ملابس (36)</button>
-            <button class="filter-tab">إكسسوارات (24)</button>
-            <button class="filter-tab">أحذية (16)</button>
-            <button class="filter-tab">مخزون منخفض (4)</button>
+          <div id="products-loading" style="text-align:center;padding:60px 20px;color:var(--t2);">
+            <div style="font-size:2rem;margin-bottom:12px;">⏳</div>
+            <div>جاري جلب المنتجات من سلة...</div>
           </div>
 
-          <div class="products-grid">
-            <div class="prod-card">
-              <div class="prod-img" style="background:rgba(99,102,241,0.08);">👗</div>
-              <div class="prod-body">
-                <div class="prod-name">فستان سواريه</div>
-                <div class="prod-cat">ملابس · M / L / XL</div>
-                <div class="prod-foot">
-                  <span class="prod-price">285 ر.س</span>
-                  <span class="prod-stock ok">✓ 24 قطعة</span>
-                </div>
-              </div>
-            </div>
-            <div class="prod-card">
-              <div class="prod-img" style="background:rgba(16,185,129,0.08);">👝</div>
-              <div class="prod-body">
-                <div class="prod-name">حقيبة جلدية</div>
-                <div class="prod-cat">إكسسوارات · أسود / بني</div>
-                <div class="prod-foot">
-                  <span class="prod-price">420 ر.س</span>
-                  <span class="prod-stock ok">✓ 15 قطعة</span>
-                </div>
-              </div>
-            </div>
-            <div class="prod-card">
-              <div class="prod-img" style="background:rgba(245,158,11,0.08);">👟</div>
-              <div class="prod-body">
-                <div class="prod-name">حذاء رياضي</div>
-                <div class="prod-cat">أحذية · 38-44</div>
-                <div class="prod-foot">
-                  <span class="prod-price">195 ر.س</span>
-                  <span class="prod-stock low">⚠ 3 قطع فقط</span>
-                </div>
-              </div>
-            </div>
-            <div class="prod-card">
-              <div class="prod-img" style="background:rgba(139,92,246,0.08);">👘</div>
-              <div class="prod-body">
-                <div class="prod-name">طقم عباية</div>
-                <div class="prod-cat">ملابس · S / M / L</div>
-                <div class="prod-foot">
-                  <span class="prod-price">650 ر.س</span>
-                  <span class="prod-stock ok">✓ 18 قطعة</span>
-                </div>
-              </div>
-            </div>
-            <div class="prod-card">
-              <div class="prod-img" style="background:rgba(6,182,212,0.08);">👚</div>
-              <div class="prod-body">
-                <div class="prod-name">بلوزة كاجوال</div>
-                <div class="prod-cat">ملابس · XS / S / M</div>
-                <div class="prod-foot">
-                  <span class="prod-price">89 ر.س</span>
-                  <span class="prod-stock ok">✓ 42 قطعة</span>
-                </div>
-              </div>
-            </div>
-            <div class="prod-card">
-              <div class="prod-img" style="background:rgba(239,68,68,0.08);">💍</div>
-              <div class="prod-body">
-                <div class="prod-name">طقم إكسسوار ذهبي</div>
-                <div class="prod-cat">إكسسوارات · واحد مقاس</div>
-                <div class="prod-foot">
-                  <span class="prod-price">320 ر.س</span>
-                  <span class="prod-stock low">⚠ 2 قطعة فقط</span>
-                </div>
-              </div>
-            </div>
-            <div class="prod-card">
-              <div class="prod-img" style="background:rgba(16,185,129,0.08);">👒</div>
-              <div class="prod-body">
-                <div class="prod-name">قبعة صيفية</div>
-                <div class="prod-cat">إكسسوارات · M / L</div>
-                <div class="prod-foot">
-                  <span class="prod-price">75 ر.س</span>
-                  <span class="prod-stock ok">✓ 30 قطعة</span>
-                </div>
-              </div>
-            </div>
-            <div class="prod-card">
-              <div class="prod-img" style="background:rgba(99,102,241,0.08);">👛</div>
-              <div class="prod-body">
-                <div class="prod-name">محفظة نسائية</div>
-                <div class="prod-cat">إكسسوارات · وردي / بيج</div>
-                <div class="prod-foot">
-                  <span class="prod-price">140 ر.س</span>
-                  <span class="prod-stock ok">✓ 20 قطعة</span>
-                </div>
-              </div>
-            </div>
+          <div id="products-error" style="display:none;text-align:center;padding:60px 20px;color:var(--t2);">
+            <div style="font-size:2rem;margin-bottom:12px;">⚠️</div>
+            <div id="products-error-msg">تعذّر تحميل المنتجات</div>
+            <button class="btn btn-ghost btn-sm" style="margin-top:14px;" onclick="loadProducts(1)">إعادة المحاولة</button>
+          </div>
+
+          <div id="products-grid" class="products-grid" style="display:none;"></div>
+
+          <div id="products-pagination" style="display:none;text-align:center;padding:20px 0;gap:8px;display:flex;justify-content:center;align-items:center;">
+            <button id="prod-prev" class="btn btn-ghost btn-sm" onclick="loadProducts(productsPage-1)">السابق</button>
+            <span id="prod-page-info" style="color:var(--t2);font-size:0.85rem;"></span>
+            <button id="prod-next" class="btn btn-ghost btn-sm" onclick="loadProducts(productsPage+1)">التالي</button>
           </div>
         </div><!-- /page-products -->
 
@@ -4621,6 +4540,9 @@
         initReportCharts();
         window._reportChartsInit = true;
       }
+
+      // Load real products from Salla lazily
+      if (pageName === 'products' && !productsLoaded) loadProducts(1);
     }
     function switchPageByName(name) {
       const el = document.querySelector('[data-page="' + name + '"]');
@@ -4846,6 +4768,7 @@
           navBadge.textContent = 'متصل';
           navBadge.style.background = 'var(--green-bg)';
           navBadge.style.color = 'var(--green)';
+          document.getElementById('waDisconnectAlert')?.remove();
         } else {
           dot.style.background = 'var(--red)';
           txt.textContent = 'غير متصل';
@@ -4867,6 +4790,77 @@
 
     refreshWaStatus();
     setInterval(refreshWaStatus, 10000);
+
+    // ── Products — load from Salla ──
+    const PRODUCTS_URL = '{{ route("salla.products") }}';
+    let productsPage = 1;
+    let productsLoaded = false;
+
+    async function loadProducts(page = 1) {
+      productsPage = page;
+      document.getElementById('products-loading').style.display = '';
+      document.getElementById('products-error').style.display = 'none';
+      document.getElementById('products-grid').style.display = 'none';
+      const pag = document.getElementById('products-pagination');
+      if (pag) pag.style.display = 'none';
+
+      try {
+        const res  = await fetch(PRODUCTS_URL + '?page=' + page);
+        const data = await res.json();
+
+        document.getElementById('products-loading').style.display = 'none';
+
+        if (!data.success || !data.products?.length) {
+          document.getElementById('products-error-msg').textContent =
+            data.error === 'no_store' ? 'لم يتم ربط متجر سلة بعد' : 'لا توجد منتجات في المتجر';
+          document.getElementById('products-error').style.display = '';
+          return;
+        }
+
+        const colors = ['rgba(99,102,241,0.08)', 'rgba(16,185,129,0.08)', 'rgba(245,158,11,0.08)', 'rgba(139,92,246,0.08)', 'rgba(6,182,212,0.08)', 'rgba(239,68,68,0.08)'];
+        const grid = document.getElementById('products-grid');
+        grid.innerHTML = data.products.map((p, i) => {
+          const stockHtml = p.stock === null ? '' :
+            p.stock > 5 ? `<span class="prod-stock ok">✓ ${p.stock} قطعة</span>` :
+            p.stock > 0 ? `<span class="prod-stock low">⚠ ${p.stock} قطع فقط</span>` :
+                          `<span class="prod-stock low">نفد المخزون</span>`;
+          const imgHtml = p.image
+            ? `<img src="${p.image}" style="width:100%;height:100%;object-fit:cover;border-radius:8px;" loading="lazy" />`
+            : `<span style="font-size:2rem;">🛍️</span>`;
+          const linkStart = p.url ? `<a href="${p.url}" target="_blank" style="text-decoration:none;color:inherit;">` : '';
+          const linkEnd   = p.url ? `</a>` : '';
+          return `
+            <div class="prod-card">
+              <div class="prod-img" style="background:${colors[i % colors.length]};display:flex;align-items:center;justify-content:center;">${imgHtml}</div>
+              <div class="prod-body">
+                <div class="prod-name">${linkStart}${p.name}${linkEnd}</div>
+                ${p.sku ? `<div class="prod-cat">SKU: ${p.sku}</div>` : ''}
+                <div class="prod-foot">
+                  ${p.price ? `<span class="prod-price">${p.price} ر.س</span>` : ''}
+                  ${stockHtml}
+                </div>
+              </div>
+            </div>`;
+        }).join('');
+
+        grid.style.display = '';
+        document.getElementById('products-sub').textContent =
+          `${data.total} منتج · صفحة ${data.page} من ${data.last_page}`;
+
+        if (data.last_page > 1) {
+          if (pag) pag.style.display = 'flex';
+          document.getElementById('prod-page-info').textContent = `${data.page} / ${data.last_page}`;
+          document.getElementById('prod-prev').disabled = data.page <= 1;
+          document.getElementById('prod-next').disabled = data.page >= data.last_page;
+        }
+
+        productsLoaded = true;
+      } catch (e) {
+        document.getElementById('products-loading').style.display = 'none';
+        document.getElementById('products-error-msg').textContent = 'حدث خطأ أثناء التحميل';
+        document.getElementById('products-error').style.display = '';
+      }
+    }
   </script>
 </body>
 

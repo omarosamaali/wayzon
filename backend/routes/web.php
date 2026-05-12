@@ -96,6 +96,7 @@ Route::middleware('auth')->group(function () {
 // Protected routes — require active subscription
 Route::middleware(['auth', 'subscription'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::get('/salla/products', [DashboardController::class, 'sallaProducts'])->name('salla.products');
 
     // Settings
     Route::post('/settings', [DashboardController::class, 'updateSettings'])->name('settings.update');

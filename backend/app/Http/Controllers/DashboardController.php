@@ -96,4 +96,52 @@ class DashboardController extends Controller
         Auth::user()->update(['plan' => $request->plan]);
         return back()->with('success', 'تم تغيير الخطة بنجاح ✅');
     }
+
+    public function sallaProducts(Request $request)
+    {
+        $store = SallaStore::where('user_id', Auth::id())->first();
+        if (!$store || !$store->access_token) {
+            return response()->json(['success' => false, 'error' => 'no_store']);
+        }
+
+        try {
+            $token    = (new \App\Services\SallaTokenService())->getValidToken($store);
+            $page     = max(1, (int) $request->query('page', 1));
+            $response = \Illuminate\Support\Facades\Http::withToken($token)
+                ->timeout(10)
+                ->get('https://api.salla.dev/admin/v2/products', [
+                    'per_page' => 20,
+                    'page'     => $page,
+                ]);
+
+            if (!$response->successful()) {
+                return response()->json(['success' => false, 'error' => 'salla_error']);
+            }
+
+            $data     = $response->json('data', []);
+            $paginate = $response->json('pagination', []);
+
+            $products = collect($data)->map(fn($p) => [
+                'id'    => $p['id'] ?? null,
+                'name'  => $p['name'] ?? '',
+                'sku'   => $p['sku'] ?? null,
+                'price' => $p['price']['amount'] ?? ($p['regular_price']['amount'] ?? null),
+                'url'   => $p['url'] ?? null,
+                'stock' => $p['quantity'] ?? null,
+                'image' => $p['main_image'] ?? null,
+                'status'=> $p['status'] ?? 'active',
+            ])->filter(fn($p) => $p['name'])->values();
+
+            return response()->json([
+                'success'    => true,
+                'products'   => $products,
+                'total'      => $paginate['total'] ?? count($products),
+                'page'       => $page,
+                'last_page'  => $paginate['total_pages'] ?? 1,
+            ]);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('sallaProducts error: ' . $e->getMessage());
+            return response()->json(['success' => false, 'error' => 'exception']);
+        }
+    }
 }
