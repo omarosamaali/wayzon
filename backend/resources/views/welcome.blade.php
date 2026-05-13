@@ -636,7 +636,7 @@ button { cursor: pointer; border: none; outline: none; font-family: inherit; }
               <span class="pe pc-period" id="pp-basic">/ شهر</span>
             </div>
             <p class="pe pc-desc">مثالية للمتاجر الناشئة التي تبدأ رحلتها مع الأتمتة</p>
-            <a href="{{ route('register') }}" class="pe btn btn-secondary pc-cta" style="width:100%;justify-content:center;padding:12px;margin-bottom:24px;display:flex;">ابدأ الآن</a>
+            <a href="https://apps.salla.sa/ar/app/1819242470" target="_blank" class="pe btn btn-secondary pc-cta" style="width:100%;justify-content:center;padding:12px;margin-bottom:24px;display:flex;">ابدأ الآن</a>
             <div class="pe pc-section-label">ما يشمله</div>
             <ul class="pe feat-list">
               <li class="pe feat-row"><span class="pe feat-icon fi-yes">✓</span><span class="pe feat-text">ربط مع سلة (الطلبات + الحالات)</span></li>
@@ -661,7 +661,7 @@ button { cursor: pointer; border: none; outline: none; font-family: inherit; }
               <span class="pe pc-period" id="pp-smart" style="color:#8b7fc7;">/ شهر</span>
             </div>
             <p class="pe pc-desc" style="color:#c4b5fd;">للمتاجر التي تريد ردوداً ذكية وتجربة عملاء استثنائية</p>
-            <a href="{{ route('register') }}" class="pe btn btn-primary pc-cta" style="width:100%;justify-content:center;padding:12px;margin-bottom:24px;display:flex;background:linear-gradient(135deg,var(--primary),var(--secondary));box-shadow:0 6px 24px var(--primary-glow);">ترقية الآن ←</a>
+            <a href="https://apps.salla.sa/ar/app/1819242470" target="_blank" class="pe btn btn-primary pc-cta" style="width:100%;justify-content:center;padding:12px;margin-bottom:24px;display:flex;background:linear-gradient(135deg,var(--primary),var(--secondary));box-shadow:0 6px 24px var(--primary-glow);">اشترك الآن ←</a>
             <div class="pe pc-section-label" style="color:#8b7fc7;">كل شيء في الأساسية +</div>
             <ul class="pe feat-list">
               <li class="pe feat-row"><span class="pe feat-icon fi-feat">✦</span><span class="pe feat-text" style="color:#c4b5fd;">ردود ذكية باستخدام OpenAI</span></li>
@@ -686,7 +686,7 @@ button { cursor: pointer; border: none; outline: none; font-family: inherit; }
               <span class="pe pc-period" id="pp-pro">/ شهر</span>
             </div>
             <p class="pe pc-desc">للمتاجر الجادة التي تريد التحكم الكامل والأداء المتميز</p>
-            <a href="{{ route('register') }}" class="pe btn pc-cta" style="width:100%;justify-content:center;padding:12px;margin-bottom:24px;display:flex;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;box-shadow:0 4px 20px rgba(139,92,246,0.35);">ترقية الآن ←</a>
+            <a href="https://apps.salla.sa/ar/app/1819242470" target="_blank" class="pe btn pc-cta" style="width:100%;justify-content:center;padding:12px;margin-bottom:24px;display:flex;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;box-shadow:0 4px 20px rgba(139,92,246,0.35);">اشترك الآن ←</a>
             <div class="pe pc-section-label" style="color:#d8b4fe;">كل شيء في الذكية +</div>
             <ul class="pe feat-list">
               <li class="pe feat-row"><span class="pe feat-icon" style="background:rgba(168,85,247,0.18);color:#d8b4fe;">◆</span><span class="pe feat-text">تحكم كامل في سيناريوهات الرد (Flows)</span></li>

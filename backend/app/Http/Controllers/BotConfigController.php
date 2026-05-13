@@ -8,6 +8,38 @@ use Illuminate\Support\Facades\Auth;
 
 class BotConfigController extends Controller
 {
+    /** Legacy demo number — never treat as a real merchant support line. */
+    private const LEGACY_DEMO_PHONE_DIGITS = '966580378050';
+
+    private function normalizeSupportPhone(?string $phone): ?string
+    {
+        $raw = preg_replace('/\s+/', '', trim((string) $phone));
+        if ($raw === '') {
+            return null;
+        }
+        $digits = preg_replace('/\D+/', '', $raw);
+        if ($digits === self::LEGACY_DEMO_PHONE_DIGITS) {
+            return null;
+        }
+        if (\Illuminate\Support\Str::startsWith($raw, '+')) {
+            return $raw;
+        }
+        if (\Illuminate\Support\Str::startsWith($raw, '00')) {
+            return '+'.substr($raw, 2);
+        }
+
+        return '+'.$digits;
+    }
+
+    private function stripLegacyPhoneFromConfig(array $config): array
+    {
+        if (isset($config['support_phone']) && $this->normalizeSupportPhone($config['support_phone']) === null) {
+            unset($config['support_phone']);
+        }
+
+        return $config;
+    }
+
     // Internal endpoint for Node.js to fetch bot config
     public function getForTenant(Request $request)
     {
@@ -22,7 +54,7 @@ class BotConfigController extends Controller
             return response()->json(['config' => null]);
         }
 
-        $config = $user->bot_config ?? [];
+        $config = $this->stripLegacyPhoneFromConfig($user->bot_config ?? []);
         $store  = \App\Models\SallaStore::where('user_id', $tenantId)->first();
 
         $globalPrompt = \Illuminate\Support\Facades\Storage::disk('local')->exists('wayzon_system_prompt.txt')
@@ -80,9 +112,36 @@ class BotConfigController extends Controller
             'msg_order_shipped'   => 'nullable|string|max:1000',
             'msg_order_delivered' => 'nullable|string|max:1000',
             'msg_order_canceled'  => 'nullable|string|max:1000',
+            'cod_enabled'         => 'nullable|boolean',
+            'msg_cod'             => 'nullable|string|max:1000',
+            'notify_phone'        => 'nullable|string|max:500',
+            'notify_orders'       => 'nullable|boolean',
         ]);
 
-        Auth::user()->update(['bot_config' => $data]);
+        $existing = Auth::user()->bot_config ?? [];
+        $merged   = array_merge($existing, $data);
+        if (isset($merged['faqs']) && is_array($merged['faqs'])) {
+            $merged['faqs'] = array_values(array_filter($merged['faqs'], function ($f) {
+                if (! is_array($f)) {
+                    return false;
+                }
+                $q = trim((string) ($f['q'] ?? ''));
+                $a = trim((string) ($f['a'] ?? ''));
+
+                return $q !== '' || $a !== '';
+            }));
+        }
+        if (array_key_exists('support_phone', $data)) {
+            $norm = $this->normalizeSupportPhone($data['support_phone'] ?? '');
+            if ($norm === null) {
+                unset($merged['support_phone']);
+            } else {
+                $merged['support_phone'] = $norm;
+            }
+        } else {
+            $merged = $this->stripLegacyPhoneFromConfig($merged);
+        }
+        Auth::user()->update(['bot_config' => $merged]);
 
         // Clear Node.js bot config cache so next message uses the new config immediately
         try {
@@ -95,6 +154,8 @@ class BotConfigController extends Controller
     // Get current config for the form
     public function get()
     {
-        return response()->json(Auth::user()->bot_config ?? []);
+        $cfg = Auth::user()->bot_config ?? [];
+
+        return response()->json($this->stripLegacyPhoneFromConfig($cfg));
     }
 }

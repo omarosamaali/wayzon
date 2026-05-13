@@ -118,14 +118,20 @@ class AdminController extends Controller
     public function setTrial(Request $request, User $user)
     {
         if (!$this->guard()) abort(403);
-        $request->validate(['days' => 'required|integer|min:1|max:365']);
+        $data = $request->validate(['days' => 'required|integer|min:1|max:365']);
+        $days  = (int) $data['days'];
 
-        $updates = ['subscription_ends_at' => now()->addDays($request->days)];
+        $base = now();
+        if ($user->subscription_ends_at && $user->subscription_ends_at->isFuture()) {
+            $base = $user->subscription_ends_at->copy();
+        }
+
+        $updates = ['subscription_ends_at' => $base->copy()->addDays($days)];
         if (!$user->plan) {
             $updates['plan'] = 'basic';
         }
         $user->update($updates);
 
-        return back()->with('success', "تم تفعيل الاشتراك {$request->days} يوم للمستخدم {$user->email}");
+        return back()->with('success', "تم تفعيل الاشتراك {$days} يوم للمستخدم {$user->email}");
     }
 }

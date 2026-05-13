@@ -97,6 +97,7 @@ Route::middleware('auth')->group(function () {
 Route::middleware(['auth', 'subscription'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/salla/products', [DashboardController::class, 'sallaProducts'])->name('salla.products');
+    Route::get('/salla/orders',   [DashboardController::class, 'sallaOrders'])->name('salla.orders');
 
     // Settings
     Route::post('/settings', [DashboardController::class, 'updateSettings'])->name('settings.update');

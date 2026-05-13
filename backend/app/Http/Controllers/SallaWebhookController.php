@@ -6,8 +6,11 @@ use App\Models\Order;
 use App\Models\SallaStore;
 use App\Models\User;
 use App\Services\OpenAIOrderMessageService;
+use App\Services\SallaTokenService;
 use App\Services\WhatsAppService;
+use App\Support\SallaOrderPresenter;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 
 class SallaWebhookController extends Controller
@@ -102,15 +105,61 @@ class SallaWebhookController extends Controller
                 'status'         => $data['status']['slug'] ?? 'new',
                 'customer_name'  => trim(($data['customer']['first_name'] ?? '') . ' ' . ($data['customer']['last_name'] ?? '')),
                 'customer_phone' => $phone ?: null,
-                'total'          => $data['amounts']['total']['amount'] ?? 0,
+                'total'          => SallaOrderPresenter::orderTotalFromPayload($data),
                 'payment_method' => $data['payment_method'] ?? null,
                 'raw_payload'    => $data,
             ]
         );
 
-        // Send WhatsApp notification
+        Cache::forget('wayzon_salla_month_stats_'.$store->user_id);
+
+        // Send WhatsApp notification to customer
         if ($order->customer_phone) {
             $this->sendWhatsApp($store->user_id, $order);
+        }
+
+        $user      = \App\Models\User::find($store->user_id);
+        $botConfig = $user?->bot_config ?? [];
+
+        // COD notification
+        $paymentMethod = strtolower((string) ($data['payment_method'] ?? $data['payment']['type'] ?? ''));
+        $isCOD = str_contains($paymentMethod, 'cod') || str_contains($paymentMethod, 'cash');
+        if ($isCOD && !empty($botConfig['cod_enabled']) && $order->customer_phone) {
+            $storeName = $store->store_name ?? '';
+            $codMsg = $botConfig['msg_cod'] ?? "📦 تم استلام طلبك بنجاح\n\nطلبك حاليًا قيد التجهيز 🙏\nبما أن طريقة الدفع هي الدفع عند الاستلام، سيتم التواصل معك لتأكيد الطلب قبل الشحن.\n\nشكراً لثقتك ❤️";
+            $codMsg = str_replace(
+                ['@{{customer_name}}', '@{{order_id}}', '@{{store_name}}', '@{{order_total}}', '@{{store_phone}}'],
+                [$order->customer_name ?? 'عزيزي العميل', $order->reference_id ?: $order->salla_order_id, $storeName, $order->total, $botConfig['support_phone'] ?? ''],
+                $codMsg
+            );
+            try {
+                $this->whatsapp->send((string) $store->user_id, (string) $order->customer_phone, $codMsg);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::error('COD msg send failed: ' . $e->getMessage());
+            }
+        }
+
+        // Notify merchant if configured
+        $botConfig = $user?->bot_config ?? [];
+        if (!empty($botConfig['notify_orders']) && !empty($botConfig['notify_phone'])) {
+            $products = collect($data['items'] ?? [])->map(
+                fn($i) => ($i['product']['name'] ?? '') . ' × ' . ($i['quantity'] ?? 1)
+            )->implode('، ');
+            $city = $data['shipping_address']['city'] ?? '';
+            $notifyMsg = "🛒 *طلب جديد*\n\n"
+                . "👤 العميل: " . ($order->customer_name ?: 'غير محدد') . "\n"
+                . "📱 الرقم: +" . ($order->customer_phone ?? '') . "\n"
+                . ($products ? "📦 الطلب: {$products}\n" : '')
+                . "💰 المبلغ: " . ($order->total) . " ريال"
+                . ($city ? "\n📍 المدينة: {$city}" : '');
+            $phones = array_filter(array_map('trim', explode(',', $botConfig['notify_phone'])));
+            foreach ($phones as $notifyPhone) {
+                try {
+                    $this->whatsapp->send((string) $store->user_id, $notifyPhone, $notifyMsg);
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::error('Merchant order notify failed (' . $notifyPhone . '): ' . $e->getMessage());
+                }
+            }
         }
     }
 
@@ -120,7 +169,14 @@ class SallaWebhookController extends Controller
         if (!$order) return;
 
         $newStatus = $data['status']['slug'] ?? $order->status;
-        $order->update(['status' => $newStatus]);
+        $newTotal  = SallaOrderPresenter::orderTotalFromPayload($data);
+        $order->update([
+            'status'      => $newStatus,
+            'total'       => $newTotal > 0 ? $newTotal : $order->total,
+            'raw_payload' => $data,
+        ]);
+
+        Cache::forget('wayzon_salla_month_stats_'.$order->user_id);
 
         // لا نرسل واتساب لحالة جديد أو بانتظار عرض سعر
         $skipStatuses = ['new', 'pending_quote', 'pending_quotation'];

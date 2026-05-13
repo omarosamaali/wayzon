@@ -44,8 +44,20 @@ const OPENAI_API_KEY  = process.env.OPENAI_API_KEY  || '';
 // ── Manual pause map: tenantId → Map<phone, expiryMs> ──
 const manualPauseMap = new Map();
 
+// ── Awaiting support reason: "tenantId:phone" → { supportPhone, timestamp } ──
+const awaitingSupportReason = new Map();
+
 // ── Track bot-sent message IDs to avoid self-triggering manual pause ──
 const botSentIds = new Set();
+
+// ── Track recent bot-send timestamps: "tenantId:phone" → ms ──
+// Guards against race condition where messages.upsert fires before botSentIds.add()
+const recentBotSendTs = new Map();
+
+// ── Dedup: track processed message IDs to prevent double-handling
+//    (messaging-history.set and messages.upsert can fire for the same msg)
+const processedMsgIds = new Set();
+setInterval(() => processedMsgIds.clear(), 5 * 60 * 1000);
 
 function getManualPauses(tenantId) {
     if (!manualPauseMap.has(tenantId)) manualPauseMap.set(tenantId, new Map());
@@ -63,6 +75,17 @@ function isManuallyPaused(tenantId, phone) {
 function setPause(tenantId, phone, minutes) {
     getManualPauses(tenantId).set(phone, Date.now() + minutes * 60 * 1000);
     console.log(`[${tenantId}] bot paused for ${phone} — ${minutes} min`);
+}
+
+// ── Send helper: records timestamp + tracks ID to prevent false manual-pause triggers ──
+async function sendBotMsg(sock, tenantId, phone, replyJid, text) {
+    recentBotSendTs.set(`${tenantId}:${phone}`, Date.now());
+    const sent = await sock.sendMessage(replyJid, { text });
+    if (sent?.key?.id) {
+        botSentIds.add(sent.key.id);
+        setTimeout(() => botSentIds.delete(sent.key.id), 30000);
+    }
+    return sent;
 }
 
 // ── Conversation history: Map<"tenantId:phone", [{role, content}]> ──
@@ -111,12 +134,14 @@ function buildSystemPrompt(storeName, cfg) {
     const c = cfg?.config || {};
 
     let prompt = `أنت موظف خدمة عملاء لمتجر "${name}" على سلة — تتكلم بالعربية بلهجة سعودية مهذبة.
-قواعد:
+قواعد صارمة لا تُخالَف:
 - ردودك قصيرة ومباشرة، بدون حشو أو مقدمات.
+- أنت تتحدث عبر الواتساب مباشرةً — لا ترسل روابط wa.me أبداً ولا تطلب من العميل التواصل عبر الواتساب لأنه يتكلم معك فيه الآن.
+- لا تُفصح عن أي بيانات تواصل (أرقام هواتف، إيميلات، روابط) لم تُذكر صراحةً في التدريب.
 - إذا ذكر العميل رقم طلب ستجد معلوماته في الرسالة — استخدمها مباشرة.
 - لا تسأل أكثر من سؤال واحد في الرسالة.
 - إذا اهتم العميل بمنتج شجّعه بشكل طبيعي.
-- إذا لم تعرف الجواب قل إن التواصل المباشر متاح.`;
+- إذا لم تعرف الجواب قل "سأحيل استفساركم للمختص وسيتواصل معك قريباً".`;
 
     const policies = [];
 
@@ -192,10 +217,11 @@ async function lookupOrder(tenantId, orderId) {
 }
 
 // ── Product search ──
-async function lookupProduct(tenantId, query) {
+async function lookupProduct(tenantId, query, opts = {}) {
     try {
+        const catalog = opts.catalog ? '&catalog=1' : '';
         const res = await fetch(
-            `${LARAVEL_URL}/internal/product-search?tenant_id=${tenantId}&q=${encodeURIComponent(query)}`,
+            `${LARAVEL_URL}/internal/product-search?tenant_id=${tenantId}&q=${encodeURIComponent(query)}${catalog}`,
             { headers: { 'X-Internal-Secret': INTERNAL_SECRET } }
         );
         return await res.json();
@@ -212,7 +238,6 @@ async function handleManualReply(tenantId, msg) {
 
     let phone;
     if (jid.endsWith('@lid')) {
-        // Admin replied from primary phone — arrives as @lid with remoteJidAlt = customer
         const altJid = msg.key.remoteJidAlt;
         if (!altJid || !altJid.includes('@s.whatsapp.net')) return;
         phone = altJid.replace('@s.whatsapp.net', '');
@@ -220,11 +245,20 @@ async function handleManualReply(tenantId, msg) {
         phone = jid.replace('@s.whatsapp.net', '');
     }
 
+    // Guard against race condition: if bot sent to this number within last 3s, skip
+    const tsKey = `${tenantId}:${phone}`;
+    const lastBotSend = recentBotSendTs.get(tsKey) || 0;
+    if (Date.now() - lastBotSend < 3000) {
+        console.log(`[${tenantId}] handleManualReply skipped — bot sent to ${phone} recently`);
+        return;
+    }
+
     const botCfg = await getBotConfig(tenantId);
     const c = botCfg?.config || {};
     if (!c.stop_on_manual) return;
     const minutes = parseInt(c.manual_resume_after) || 30;
     setPause(tenantId, phone, minutes);
+    console.log(`[${tenantId}] manual pause set for ${phone} — ${minutes} min`);
 }
 
 // ── Main message handler ──
@@ -265,6 +299,29 @@ async function handleIncomingMessage(tenantId, sock, msg) {
 
     console.log(`[${tenantId}] incoming from ${phone}: ${text}`);
 
+    // ── Support reason pending: customer is replying with their support reason ──
+    const awaitKey = `${tenantId}:${phone}`;
+    if (awaitingSupportReason.has(awaitKey)) {
+        const { supportPhone } = awaitingSupportReason.get(awaitKey);
+        awaitingSupportReason.delete(awaitKey);
+
+        // Forward to merchant's support number
+        if (supportPhone && clients[tenantId]) {
+            const supportJid = supportPhone + '@s.whatsapp.net';
+            const notifyMsg = `🚨 *طلب دعم فني جديد*\n\n👤 العميل: +${phone}\n📱 الرقم: +${phone}\n📝 *السبب:*\n"${text}"`;
+            try { await sock.sendMessage(supportJid, { text: notifyMsg }); } catch(e) { console.error(`[${tenantId}] support notify failed:`, e.message); }
+        }
+
+        // Confirm to customer
+        const reply = 'تم تحويل طلبك للدعم الفني ✅\nالرجاء الانتظار وسيتم الرد عليك قريبًا.';
+        await sendBotMsg(sock, tenantId, phone, replyJid, reply);
+
+        // Pause AI for this chat (60 min default)
+        setPause(tenantId, phone, 60);
+        console.log(`[${tenantId}] support reason received from ${phone} — forwarded & paused`);
+        return;
+    }
+
     // Bot paused for this contact due to manual intervention
     if (isManuallyPaused(tenantId, phone)) {
         console.log(`[${tenantId}] bot paused for ${phone} — skipping`);
@@ -283,8 +340,7 @@ async function handleIncomingMessage(tenantId, sock, msg) {
             const matched = keywords.filter(k => lowerText.includes(k)).length;
             if (matched >= Math.min(2, keywords.length)) {
                 console.log(`[${tenantId}] FAQ match → no AI`);
-                const sent = await sock.sendMessage(replyJid, { text: faq.a });
-                if (sent?.key?.id) { botSentIds.add(sent.key.id); setTimeout(() => botSentIds.delete(sent.key.id), 15000); }
+                await sendBotMsg(sock, tenantId, phone, replyJid, faq.a);
                 addToHistory(tenantId, phone, 'user', text);
                 addToHistory(tenantId, phone, 'assistant', faq.a);
                 return;
@@ -293,25 +349,26 @@ async function handleIncomingMessage(tenantId, sock, msg) {
     }
 
     // ── 2. Product search — skip if merchant has custom training (AI handles it) ──
-    const productKeywords = ['سعر', 'بكم', 'بكام', 'منتج', 'متوفر', 'يتوفر', 'موجود', 'أسعار', 'اسعار'];
+    const productKeywords = ['سعر', 'بكم', 'بكام', 'منتج', 'متوفر', 'يتوفر', 'موجود', 'أسعار', 'اسعار', 'عندكم', 'عندك', 'تبيعون', 'تبيع', 'عرض', 'كتالوج', 'قائمة'];
     const isProductQuery  = productKeywords.some(k => text.includes(k));
 
-    if (isProductQuery && !c.store_training) {
-        const searchTerm = text.replace(/[؟?!،,]/g, '').trim();
-        const data = await lookupProduct(tenantId, searchTerm);
+    if (isProductQuery) {
+        const searchTerm = text.replace(/[؟?!،,]/g, ' ').trim();
+        const catalogOnly = searchTerm.length < 3 || /^(عندكم|وش|ايش|شنو|منتجات)/i.test(searchTerm.trim());
+        const data = await lookupProduct(tenantId, searchTerm || text, { catalog: catalogOnly });
         if (data.found && data.products?.length) {
             let reply = 'هذي المنتجات المتاحة 👇\n\n';
             data.products.forEach((p, i) => {
                 reply += `*${i + 1}. ${p.name}*\n`;
                 if (p.price) reply += `السعر: ${p.price} ر.س\n`;
-                if (p.stock !== null) reply += p.stock > 0 ? `المخزون: متوفر ✅\n` : `المخزون: غير متوفر ❌\n`;
-                if (p.url) reply += `الرابط: ${p.url}\n`;
+                if (p.unlimited) reply += 'المخزون: متوفر ✅\n';
+                else if (p.in_stock) reply += (p.stock != null ? `المخزون: متوفر (${p.stock} قطعة) ✅\n` : 'المخزون: متوفر ✅\n');
+                else reply += 'المخزون: غير متوفر ❌\n';
                 reply += '\n';
             });
             reply = reply.trim();
             console.log(`[${tenantId}] PRODUCT direct reply → ${phone}`);
-            const sent = await sock.sendMessage(replyJid, { text: reply });
-            if (sent?.key?.id) { botSentIds.add(sent.key.id); setTimeout(() => botSentIds.delete(sent.key.id), 15000); }
+            await sendBotMsg(sock, tenantId, phone, replyJid, reply);
             addToHistory(tenantId, phone, 'user', text);
             addToHistory(tenantId, phone, 'assistant', reply);
             return;
@@ -331,45 +388,43 @@ async function handleIncomingMessage(tenantId, sock, msg) {
                 'in_progress': 'قيد التنفيذ 🔄', 'paid': 'تم الدفع ✅',
                 'shipped': 'تم الشحن 🚚', 'delivering': 'في الطريق إليك 🛵',
                 'out_for_delivery': 'في الطريق إليك 🛵', 'delivered': 'تم التوصيل ✅',
+                'completed': 'تم التوصيل ✅',
                 'canceled': 'ملغي ❌', 'returned': 'مسترجع 🔁',
                 'pending_payment': 'بانتظار الدفع 💳',
             };
-            const statusLabel = statusMap[data.status] || data.status_label || data.status;
-            const reply = `مرحباً 👋\nطلبك رقم *#${data.order_id}*\nالحالة: ${statusLabel}\nالإجمالي: ${data.total} ر.س`;
+            const statusLabel = data.status_label || statusMap[data.status] || data.status;
+            const totalNum = Number(data.total);
+            const totalStr = Number.isFinite(totalNum) ? totalNum.toFixed(2).replace(/\.00$/, '') : String(data.total ?? '0');
+            const reply = `مرحباً 👋\nطلبك رقم *#${data.order_id}*\nالحالة: ${statusLabel}\nالإجمالي: ${totalStr} ر.س`;
             console.log(`[${tenantId}] ORDER direct reply → ${phone}`);
-            const sent = await sock.sendMessage(replyJid, { text: reply });
-            if (sent?.key?.id) { botSentIds.add(sent.key.id); setTimeout(() => botSentIds.delete(sent.key.id), 15000); }
+            await sendBotMsg(sock, tenantId, phone, replyJid, reply);
             addToHistory(tenantId, phone, 'user', text);
             addToHistory(tenantId, phone, 'assistant', reply);
             return;
         } else {
-            // Order not found — ask for correct number directly
             const reply = `ما لقيت طلب برقم ${orderMatch[0]} 🔍\nتأكد من الرقم أو أرسل لي رقم الطلب من رسالة التأكيد.`;
-            const sent = await sock.sendMessage(replyJid, { text: reply });
-            if (sent?.key?.id) { botSentIds.add(sent.key.id); setTimeout(() => botSentIds.delete(sent.key.id), 15000); }
+            await sendBotMsg(sock, tenantId, phone, replyJid, reply);
             addToHistory(tenantId, phone, 'user', text);
             addToHistory(tenantId, phone, 'assistant', reply);
             return;
         }
     }
 
-    // If order keywords without a number — ask for order number directly
     if (isOrderQuery && !orderMatch) {
         const reply = 'أرسل لي رقم طلبك وأخبرك بحالته فوراً 📦';
-        const sent = await sock.sendMessage(replyJid, { text: reply });
-        if (sent?.key?.id) { botSentIds.add(sent.key.id); setTimeout(() => botSentIds.delete(sent.key.id), 15000); }
+        await sendBotMsg(sock, tenantId, phone, replyJid, reply);
         addToHistory(tenantId, phone, 'user', text);
         addToHistory(tenantId, phone, 'assistant', reply);
         return;
     }
 
     // ── 3. Support transfer ──
-    const supportKeywords = ['موظف', 'بشري', 'إنسان', 'انسان', 'دعم', 'مسؤول', 'حولني', 'تحويل', 'تكلم', 'اتصل', 'تواصل مع'];
+    const supportKeywords = ['موظف', 'بشري', 'إنسان', 'انسان', 'دعم', 'مسؤول', 'حولني', 'تحويل', 'تكلم', 'اتصل', 'تواصل مع', 'مشكلة', 'مو فاهم', 'ما فهمت'];
     const isSupportRequest = supportKeywords.some(k => text.includes(k));
     if (isSupportRequest && c.support_phone) {
-        const reply = `للتواصل مع فريق الدعم مباشرة 👇\nwa.me/${c.support_phone}`;
-        const sent = await sock.sendMessage(replyJid, { text: reply });
-        if (sent?.key?.id) { botSentIds.add(sent.key.id); setTimeout(() => botSentIds.delete(sent.key.id), 15000); }
+        awaitingSupportReason.set(`${tenantId}:${phone}`, { supportPhone: c.support_phone, timestamp: Date.now() });
+        const reply = 'يبدو أنك تحتاج مساعدة من الدعم الفني 🙏\nاكتب سبب طلب الدعم باختصار وسيتم تحويلك فوراً.';
+        await sendBotMsg(sock, tenantId, phone, replyJid, reply);
         addToHistory(tenantId, phone, 'user', text);
         addToHistory(tenantId, phone, 'assistant', reply);
         return;
@@ -397,19 +452,16 @@ async function handleIncomingMessage(tenantId, sock, msg) {
     const aiReply = await callOpenAI(messages);
 
     if (!aiReply) {
-        const fallback = 'أهلاً بك! 👋\nكيف أقدر أساعدك؟';
-        const sentFb = await sock.sendMessage(replyJid, { text: fallback });
-        if (sentFb?.key?.id) { botSentIds.add(sentFb.key.id); setTimeout(() => botSentIds.delete(sentFb.key.id), 15000); }
+        await sendBotMsg(sock, tenantId, phone, replyJid, 'أهلاً بك! 👋\nكيف أقدر أساعدك؟');
         return;
     }
 
     addToHistory(tenantId, phone, 'assistant', aiReply);
     console.log(`[${tenantId}] AI reply to ${phone}: ${aiReply.substring(0, 60)}`);
-    const sent = await sock.sendMessage(replyJid, { text: aiReply });
+    const sent = await sendBotMsg(sock, tenantId, phone, replyJid, aiReply);
     console.log(`[${tenantId}] sent OK to ${phone}, msgId=${sent?.key?.id}`);
     if (sent?.key?.id) {
-        botSentIds.add(sent.key.id);
-        setTimeout(() => botSentIds.delete(sent.key.id), 15000);
+        // already tracked in sendBotMsg
     }
 }
 
@@ -479,10 +531,12 @@ async function createSocket(tenantId, options = {}) {
             return t >= cutoff && !m.key.fromMe
                 && !m.key.remoteJid?.endsWith('@lid')
                 && !m.key.remoteJid?.endsWith('@g.us')
-                && !processedHistoryIds.has(m.key.id);
+                && !processedHistoryIds.has(m.key.id)
+                && !processedMsgIds.has(m.key.id);
         });
         for (const msg of recent) {
             processedHistoryIds.add(msg.key.id);
+            processedMsgIds.add(msg.key.id);
             console.log(`[${tenantId}] history-msg from ${msg.key.remoteJid}`);
             await handleIncomingMessage(tenantId, sock, msg).catch(e =>
                 console.error(`[${tenantId}] history handleIncomingMessage error`, e.message)
@@ -511,6 +565,8 @@ async function createSocket(tenantId, options = {}) {
                     await handleManualReply(tenantId, msg).catch(() => {});
                 }
             } else {
+                if (processedMsgIds.has(msg.key.id)) continue;
+                processedMsgIds.add(msg.key.id);
                 await handleIncomingMessage(tenantId, sock, msg).catch(e =>
                     console.error(`[${tenantId}] handleIncomingMessage error`, e.message)
                 );

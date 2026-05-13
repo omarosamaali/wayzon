@@ -1836,15 +1836,37 @@
 
 <body>
 
-  {{-- Trial banner: shown only during active trial (no paid plan yet) --}}
+  {{-- Trial banner: active trial, no paid subscription window --}}
   @php
     $subActive   = Auth::user()->subscription_ends_at && Auth::user()->subscription_ends_at->isFuture();
-    $trialActive = Auth::user()->trial_ends_at && Auth::user()->trial_ends_at->isFuture();
-    $trialDays   = $trialActive ? Auth::user()->trial_ends_at->diffInDays(now()) : 0;
+    $trialEnd    = Auth::user()->trial_ends_at;
+    $trialActive = $trialEnd && $trialEnd->isFuture();
+    $trialRemainingLabel = '';
+    if ($trialActive && $trialEnd) {
+        $secs = $trialEnd->getTimestamp() - now()->getTimestamp();
+        if ($secs > 0) {
+            $days = intdiv($secs, 86400);
+            $hours = (int) ceil(($secs % 86400) / 3600);
+            if ($days >= 1) {
+                $trialRemainingLabel = $days.' يوم';
+            } elseif ($secs >= 3600) {
+                $trialRemainingLabel = $hours.' ساعة';
+            } else {
+                $trialRemainingLabel = max(1, (int) ceil($secs / 60)).' دقيقة';
+            }
+        }
+    }
+    $wzSupportRaw = trim((string) data_get(Auth::user()->bot_config, 'support_phone', ''));
+    if (preg_replace('/\D+/', '', $wzSupportRaw) === '966580378050') {
+        $wzSupportRaw = '';
+    }
+    $wzSupportPhone = $wzSupportRaw !== ''
+        ? (\Illuminate\Support\Str::startsWith($wzSupportRaw, '+') ? $wzSupportRaw : '+'.$wzSupportRaw)
+        : '';
   @endphp
-  @if(!$subActive && $trialActive)
-  <div style="position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#1c2233;border:1px solid rgba(245,158,11,0.35);border-radius:12px;padding:12px 20px;z-index:999;display:flex;align-items:center;gap:12px;box-shadow:0 8px 32px rgba(0,0,0,0.4);white-space:nowrap;">
-    <span style="font-size:0.85rem;color:#fbbf24;font-weight:700;">⏳ تجربة مجانية — باقي {{ $trialDays > 0 ? $trialDays.' يوم' : (Auth::user()->trial_ends_at->diffInHours(now()).' ساعة') }}</span>
+  @if(!$subActive && $trialActive && $trialRemainingLabel !== '')
+  <div style="position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#1c2233;border:1px solid rgba(245,158,11,0.35);border-radius:12px;padding:12px 20px;z-index:999;display:flex;align-items:center;gap:12px;box-shadow:0 8px 32px rgba(0,0,0,0.4);max-width:96vw;flex-wrap:wrap;justify-content:center;">
+    <span style="font-size:0.85rem;color:#fbbf24;font-weight:700;">⏳ تجربة مجانية — باقي {{ $trialRemainingLabel }}</span>
     <button onclick="this.closest('[style*=fixed]').style.display='none';switchPageByName('plans')" style="padding:6px 14px;border-radius:8px;font-size:0.8rem;font-weight:800;font-family:inherit;cursor:pointer;border:none;background:#6366f1;color:#fff;">اشترك الآن</button>
   </div>
   @endif
@@ -1996,8 +2018,12 @@
 
           <div class="greeting">
             <div>
-              <h2>صباح الخير، {{ Auth::user()->name }}! 👋</h2>
-              <p>الجمعة، 11 أبريل 2025 — إليك ملخص متجرك اليوم</p>
+              @php
+                $h = (int) now()->format('G');
+                $greet = $h < 12 ? 'صباح الخير' : ($h < 17 ? 'مساء الخير' : 'مساء الخير');
+              @endphp
+              <h2>{{ $greet }}، {{ Auth::user()->name }}! 👋</h2>
+              <p>{{ $greetingDate }} — إليك ملخص متجرك اليوم</p>
             </div>
             <div class="greeting-actions">
               <button class="btn btn-ghost btn-sm">📥 تصدير</button>
@@ -2034,9 +2060,9 @@
             <div class="stat-card s-amber">
               <div class="stat-icon si-amber">💬</div>
               <div class="stat-val">{{ $waSent }}</div>
-              <div class="stat-lbl">رسائل واتساب أُرسلت</div>
+              <div class="stat-lbl">رسائل واتساب (إشعارات الطلب)</div>
               <div style="display:flex;align-items:center;gap:5px;">
-                <span class="stat-note">إجمالي الرسائل</span>
+                <span class="stat-note">عند نجاح إرسال قالب الطلب</span>
               </div>
             </div>
           </div>
@@ -2078,43 +2104,21 @@
               <div class="donut-wrap">
                 <canvas id="categoryChart" style="max-height:150px;"></canvas>
                 <div class="donut-center">
-                  <div class="donut-num">348</div>
+                  <div class="donut-num">{{ $orderCounts['all'] }}</div>
                   <div class="donut-lbl">طلب</div>
                 </div>
               </div>
               <div class="cat-list">
+                @foreach($categoryChart as $row)
                 <div class="cat-item">
-                  <div class="cat-dot" style="background:#6366f1"></div>
-                  <span class="cat-name">ملابس</span>
+                  <div class="cat-dot" style="background:{{ $row['color'] }}"></div>
+                  <span class="cat-name">{{ $row['name'] }}</span>
                   <div class="cat-bar-bg">
-                    <div class="cat-bar" style="width:42%;background:#6366f1"></div>
+                    <div class="cat-bar" style="width:{{ $row['pct'] }}%;background:{{ $row['color'] }}"></div>
                   </div>
-                  <span class="cat-pct">42%</span>
+                  <span class="cat-pct">{{ $row['pct'] }}%</span>
                 </div>
-                <div class="cat-item">
-                  <div class="cat-dot" style="background:#10b981"></div>
-                  <span class="cat-name">إكسسوارات</span>
-                  <div class="cat-bar-bg">
-                    <div class="cat-bar" style="width:28%;background:#10b981"></div>
-                  </div>
-                  <span class="cat-pct">28%</span>
-                </div>
-                <div class="cat-item">
-                  <div class="cat-dot" style="background:#f59e0b"></div>
-                  <span class="cat-name">أحذية</span>
-                  <div class="cat-bar-bg">
-                    <div class="cat-bar" style="width:18%;background:#f59e0b"></div>
-                  </div>
-                  <span class="cat-pct">18%</span>
-                </div>
-                <div class="cat-item">
-                  <div class="cat-dot" style="background:#8b5cf6"></div>
-                  <span class="cat-name">أخرى</span>
-                  <div class="cat-bar-bg">
-                    <div class="cat-bar" style="width:12%;background:#8b5cf6"></div>
-                  </div>
-                  <span class="cat-pct">12%</span>
-                </div>
+                @endforeach
               </div>
             </div>
           </div>
@@ -2241,114 +2245,57 @@
         </div><!-- /page-dashboard -->
 
 
-        <!-- ══════════════════ ORDERS ══════════════════ -->
+        <!-- ══════════════════ ORDERS (live from Salla) ══════════════════ -->
         <div class="page" id="page-orders">
           <div class="page-header">
             <div>
               <div class="page-h1">📦 الطلبات</div>
-              <div class="page-sub">إجمالي {{ $orderCounts['all'] }} طلب</div>
+              <div class="page-sub" id="orders-page-sub">جاري التحميل من متجر سلة…</div>
             </div>
           </div>
 
-          <div class="filter-bar">
-            <button class="filter-tab active">الكل ({{ $orderCounts['all'] }})</button>
-            <button class="filter-tab">جديد ({{ $orderCounts['new'] }})</button>
-            <button class="filter-tab">قيد التوصيل ({{ $orderCounts['shipped'] }})</button>
-            <button class="filter-tab">مكتمل ({{ $orderCounts['delivered'] }})</button>
-            <button class="filter-tab">ملغي ({{ $orderCounts['canceled'] }})</button>
+          <div class="filter-bar" id="orders-filter-bar">
+            <button class="filter-tab active" data-status="" onclick="merchantOrdersFilterClick(this)">الكل</button>
+            <button class="filter-tab" data-status="new" onclick="merchantOrdersFilterClick(this)">جديد</button>
+            <button class="filter-tab" data-status="delivering" onclick="merchantOrdersFilterClick(this)">قيد التوصيل</button>
+            <button class="filter-tab" data-status="delivered" onclick="merchantOrdersFilterClick(this)">مكتمل</button>
+            <button class="filter-tab" data-status="canceled" onclick="merchantOrdersFilterClick(this)">ملغي</button>
           </div>
 
-          <div class="full-panel">
-            <table>
-              <thead>
-                <tr>
-                  <th>رقم الطلب</th>
-                  <th>العميل</th>
-                  <th>المبلغ</th>
-                  <th>طريقة الدفع</th>
-                  <th>تاريخ الطلب</th>
-                  <th>الحالة</th>
-                  <th>واتساب</th>
-                </tr>
-              </thead>
-              <tbody>
-                @forelse($allOrders as $order)
-                @php
-                  $initial = mb_substr($order->customer_name ?? 'ع', 0, 1);
-                  $colors = ['linear-gradient(135deg,#6366f1,#8b5cf6)','linear-gradient(135deg,#06b6d4,#6366f1)','linear-gradient(135deg,#8b5cf6,#ec4899)','linear-gradient(135deg,#f59e0b,#ef4444)','linear-gradient(135deg,#10b981,#06b6d4)'];
-                  $color = $colors[$loop->index % count($colors)];
-                  $statusMap = [
-                    'new'                => ['b-primary', '🆕 جديد'],
-                    'in_progress'        => ['b-amber',   '🔄 قيد التنفيذ'],
-                    'under_review'       => ['b-amber',   '⏳ بانتظار المراجعة'],
-                    'pending_review'     => ['b-amber',   '⏳ بانتظار المراجعة'],
-                    'pending_payment'    => ['b-amber',   '💳 بانتظار الدفع'],
-                    'paid'               => ['b-primary', '✅ تم الدفع'],
-                    'payment_confirmed'  => ['b-primary', '✅ تم الدفع'],
-                    'shipped'            => ['b-amber',   '🚚 تم الشحن'],
-                    'delivering'         => ['b-amber',   '🛵 جاري التوصيل'],
-                    'out_for_delivery'   => ['b-amber',   '🛵 جاري التوصيل'],
-                    'delivered'          => ['b-green',   '🎉 تم التوصيل'],
-                    'canceled'           => ['b-red',     '❌ ملغي'],
-                    'returned'           => ['b-red',     '🔁 مسترجع'],
-                    'refunded'           => ['b-red',     '🔁 مسترجع'],
-                    'under_return'       => ['b-amber',   '🔄 قيد الاسترجاع'],
-                    'return_in_progress' => ['b-amber',   '🔄 قيد الاسترجاع'],
-                    'pending_quote'      => ['b-primary', '📋 بانتظار عرض سعر'],
-                    'pending_quotation'  => ['b-primary', '📋 بانتظار عرض سعر'],
-                  ];
-                  [$badgeClass, $badgeText] = $statusMap[$order->status] ?? ['b-primary', $order->status];
-                  $paymentMap = [
-                    'cod'          => 'دفع عند التسليم',
-                    'credit_card'  => 'بطاقة ائتمان',
-                    'mada'         => 'مدى',
-                    'apple_pay'    => 'Apple Pay',
-                    'bank_transfer'=> 'تحويل بنكي',
-                    'wallet'       => 'محفظة',
-                    'tamara'       => 'تمارا',
-                    'tabby'        => 'تابي',
-                  ];
-                  $paymentLabel = $paymentMap[$order->payment_method] ?? ($order->payment_method ?? '—');
-                  $orderNum = $order->reference_id ?: $order->salla_order_id;
-                @endphp
-                <tr>
-                  <td><span class="order-id">#{{ $orderNum }}</span></td>
-                  <td>
-                    <div class="cust-cell">
-                      <div class="cust-ava" style="background:{{ $color }}">{{ $initial }}</div>
-                      <div>
-                        <div style="color:var(--t1);font-weight:600;font-size:0.83rem;">{{ $order->customer_name ?? 'عميل' }}</div>
-                        <div style="font-size:0.7rem;color:var(--t3);">{{ $order->customer_phone ?? '—' }}</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td><span class="amount">{{ number_format($order->total, 0) }} ر.س</span></td>
-                  <td><span class="badge b-primary">{{ $paymentLabel }}</span></td>
-                  <td style="font-size:0.78rem;">
-                    {{ $order->created_at->format('d M Y') }}<br>
-                    <span style="color:var(--t3);font-size:0.7rem;">{{ $order->created_at->format('h:i A') }}</span>
-                  </td>
-                  <td><span class="badge {{ $badgeClass }}">{{ $badgeText }}</span></td>
-                  <td>
-                    @if($order->whatsapp_sent)
-                      <span class="badge b-green">✓ أُرسل</span>
-                    @else
-                      <span class="badge b-red">✕ لم يُرسل</span>
-                    @endif
-                  </td>
-                </tr>
-                @empty
-                <tr>
-                  <td colspan="7" style="text-align:center;color:var(--t3);padding:32px;">لا توجد طلبات بعد</td>
-                </tr>
-                @endforelse
-              </tbody>
-            </table>
-            @if($allOrders->hasPages())
-            <div style="display:flex;justify-content:center;gap:8px;padding:16px;">
-              {{ $allOrders->links() }}
+          <div id="orders-loading" style="text-align:center;padding:60px 20px;color:var(--t2);">
+            <div style="font-size:2rem;margin-bottom:12px;">⏳</div>
+            <div>جاري تحميل الطلبات…</div>
+          </div>
+
+          <div id="orders-error" style="display:none;text-align:center;padding:60px 20px;color:var(--t2);">
+            <div style="font-size:2rem;margin-bottom:12px;">⚠️</div>
+            <div id="orders-error-msg">حدث خطأ أثناء التحميل</div>
+            <button class="btn btn-ghost btn-sm" style="margin-top:14px;" onclick="loadMerchantOrders(1)">إعادة المحاولة</button>
+          </div>
+
+          <div id="orders-table-wrap" style="display:none;">
+            <div class="full-panel">
+              <table>
+                <thead>
+                  <tr>
+                    <th>رقم الطلب</th>
+                    <th>العميل</th>
+                    <th>المنتجات</th>
+                    <th>الإجمالي</th>
+                    <th>تاريخ الطلب</th>
+                    <th>الحالة</th>
+                    <th>واتساب</th>
+                  </tr>
+                </thead>
+                <tbody id="merchant-orders-tbody"></tbody>
+              </table>
             </div>
-            @endif
+            <div id="orders-pagination" style="display:none;justify-content:center;align-items:center;gap:12px;margin-top:16px;">
+              <button id="orders-prev" class="btn btn-ghost btn-sm" onclick="loadMerchantOrders(merchantOrdersPage-1)">السابق</button>
+              <span id="orders-page-info" style="font-size:0.82rem;color:var(--t2);"></span>
+              <button id="orders-next" class="btn btn-ghost btn-sm" onclick="loadMerchantOrders(merchantOrdersPage+1)">التالي</button>
+            </div>
+            <div id="orders-sub" style="text-align:center;font-size:0.78rem;color:var(--t3);margin-top:8px;"></div>
           </div>
         </div><!-- /page-orders -->
 
@@ -2363,53 +2310,26 @@
             <button class="btn btn-primary btn-sm">+ شحنة جديدة</button>
           </div>
 
-          <!-- Shipping stats -->
+          <!-- Shipping stats (from synced Salla orders in Wayzon) -->
           <div class="shipping-cards">
             <div class="ship-stat" style="border-right:3px solid var(--amber);">
-              <div class="ship-stat-val" style="color:var(--amber)">87</div>
+              <div class="ship-stat-val" style="color:var(--amber)">{{ $shipDelivering }}</div>
               <div class="ship-stat-lbl">🚚 قيد التوصيل</div>
             </div>
             <div class="ship-stat" style="border-right:3px solid var(--green);">
-              <div class="ship-stat-val" style="color:var(--green)">224</div>
+              <div class="ship-stat-val" style="color:var(--green)">{{ $shipDone }}</div>
               <div class="ship-stat-lbl">✅ مكتملة</div>
             </div>
             <div class="ship-stat" style="border-right:3px solid var(--red);">
-              <div class="ship-stat-val" style="color:var(--red)">12</div>
-              <div class="ship-stat-lbl">⚠️ مشكلة في التوصيل</div>
+              <div class="ship-stat-val" style="color:var(--red)">{{ $shipProblem }}</div>
+              <div class="ship-stat-lbl">⚠️ ملغية / مسترجعة</div>
             </div>
           </div>
 
-          <!-- Track card -->
-          <div class="track-card">
-            <div class="track-header">
-              <div>
-                <div style="font-size:0.9375rem;font-weight:800;color:var(--t1);">تتبع الشحنة #SHP-0447</div>
-                <div style="font-size:0.78rem;color:var(--t3);margin-top:3px;">رقم التتبع: SA1234567890 — أرامكس</div>
-              </div>
-              <span class="badge b-amber">🚚 في الطريق</span>
-            </div>
-            <div class="track-steps">
-              <div class="track-step">
-                <div class="step-circle done">✓</div>
-                <div class="step-line done"></div>
-              </div>
-              <div class="track-step">
-                <div class="step-circle done">✓</div>
-                <div class="step-line done"></div>
-              </div>
-              <div class="track-step">
-                <div class="step-circle active">🚚</div>
-                <div class="step-line"></div>
-              </div>
-              <div class="track-step" style="flex:0;">
-                <div class="step-circle">📦</div>
-              </div>
-            </div>
-            <div class="step-labels">
-              <span class="step-lbl done">تأكيد الطلب</span>
-              <span class="step-lbl done">جهّز للشحن</span>
-              <span class="step-lbl active">في الطريق</span>
-              <span class="step-lbl">تم التسليم</span>
+          <!-- Track note -->
+          <div class="track-card" style="padding:18px 20px;">
+            <div style="font-size:0.88rem;color:var(--t2);line-height:1.6;">
+              تُحسب الأرقام أعلاه من الطلبات المسجّلة في Wayzon (مزامنة ويب هوك سلة). لتتبع شركة الشحن ورقم البوليصة افتح تفاصيل الطلب من لوحة سلة.
             </div>
           </div>
 
@@ -2433,60 +2353,9 @@
               </thead>
               <tbody>
                 <tr>
-                  <td><span class="order-id">#SHP-0447</span></td>
-                  <td>
-                    <div class="cust-cell">
-                      <div class="cust-ava" style="background:linear-gradient(135deg,#06b6d4,#6366f1)">س</div>سارة ع.
-                    </div>
+                  <td colspan="7" style="text-align:center;color:var(--t3);padding:28px;font-size:0.88rem;line-height:1.7;">
+                    تفاصيل شركة الشحن ورقم البوليصة غير متزامنة حالياً داخل Wayzon. استخدم صفحة <strong>الطلبات</strong> أعلاه لعرض الطلبات الحية من سلة، أو افتح الطلب في لوحة تحكم سلة لمتابعة الشحن.
                   </td>
-                  <td style="font-size:0.78rem;">الرياض، حي العليا<br><span style="color:var(--t3);">الشارع الرئيسي
-                      45</span></td>
-                  <td>أرامكس</td>
-                  <td style="font-family:monospace;font-size:0.78rem;">SA1234567890</td>
-                  <td><span class="amount">178 ر.س</span></td>
-                  <td><span class="badge b-amber">🚚 في الطريق</span></td>
-                </tr>
-                <tr>
-                  <td><span class="order-id">#SHP-0446</span></td>
-                  <td>
-                    <div class="cust-cell">
-                      <div class="cust-ava" style="background:linear-gradient(135deg,#6366f1,#8b5cf6)">أ</div>أحمد م.
-                    </div>
-                  </td>
-                  <td style="font-size:0.78rem;">جدة، حي الزهراء<br><span style="color:var(--t3);">شارع التحلية
-                      12</span></td>
-                  <td>SMSA</td>
-                  <td style="font-family:monospace;font-size:0.78rem;">JD9876543210</td>
-                  <td><span class="amount">285 ر.س</span></td>
-                  <td><span class="badge b-green">✓ تم التسليم</span></td>
-                </tr>
-                <tr>
-                  <td><span class="order-id">#SHP-0445</span></td>
-                  <td>
-                    <div class="cust-cell">
-                      <div class="cust-ava" style="background:linear-gradient(135deg,#f59e0b,#ef4444)">م</div>منى ك.
-                    </div>
-                  </td>
-                  <td style="font-size:0.78rem;">مكة المكرمة، العزيزية<br><span style="color:var(--t3);">طريق مكة قديم
-                      8</span></td>
-                  <td>درب</td>
-                  <td style="font-family:monospace;font-size:0.78rem;">MK5551234000</td>
-                  <td><span class="amount">650 ر.س</span></td>
-                  <td><span class="badge b-green">✓ تم التسليم</span></td>
-                </tr>
-                <tr>
-                  <td><span class="order-id">#SHP-0444</span></td>
-                  <td>
-                    <div class="cust-cell">
-                      <div class="cust-ava" style="background:linear-gradient(135deg,#8b5cf6,#ec4899)">خ</div>خالد ف.
-                    </div>
-                  </td>
-                  <td style="font-size:0.78rem;">الدمام، حي الفيصلية<br><span style="color:var(--t3);">شارع الملك فهد
-                      3</span></td>
-                  <td>أرامكس</td>
-                  <td style="font-family:monospace;font-size:0.78rem;">DM1122334455</td>
-                  <td><span class="amount">420 ر.س</span></td>
-                  <td><span class="badge b-primary">📦 جهّز للشحن</span></td>
                 </tr>
               </tbody>
             </table>
@@ -2496,67 +2365,68 @@
 
         <!-- ══════════════════ CUSTOMERS ══════════════════ -->
         <div class="page" id="page-customers">
+          @php
+            $custGrads = [
+              'linear-gradient(135deg,#f59e0b,#ef4444)',
+              'linear-gradient(135deg,#6366f1,#8b5cf6)',
+              'linear-gradient(135deg,#06b6d4,#6366f1)',
+              'linear-gradient(135deg,#8b5cf6,#ec4899)',
+              'linear-gradient(135deg,#10b981,#06b6d4)',
+              'linear-gradient(135deg,#f59e0b,#6366f1)',
+            ];
+          @endphp
           <div class="page-header">
             <div>
               <div class="page-h1">👥 العملاء</div>
-              <div class="page-sub">1,204 عميل مسجل</div>
+              <div class="page-sub">{{ number_format($totalCustomers) }} عميل مميّز برقم جوال من طلباتك</div>
             </div>
-            <button class="btn btn-primary btn-sm">+ إضافة عميل</button>
+            <button type="button" class="btn btn-ghost btn-sm" disabled
+              title="تُضاف أرقام العملاء تلقائياً من الطلبات الواردة عبر سلة">+ إضافة عميل</button>
           </div>
 
-          <!-- Top customers -->
+          @if($topCustomers->isEmpty())
+          <div class="full-panel" style="margin-bottom:14px;">
+            <div style="padding:28px 20px;text-align:center;color:var(--t2);font-size:0.9rem;line-height:1.8;">
+              لا يوجد عملاء في القائمة بعد.<br>
+              عند وصول طلبات من سلة برقم جوال سيُجمع العملاء هنا تلقائياً.
+            </div>
+          </div>
+          @else
           <div
             style="font-size:0.8rem;font-weight:800;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;">
-            أفضل العملاء</div>
+            أعلى العملاء إنفاقاً (من طلباتك)</div>
           <div class="customers-grid">
+            @foreach($topCustomers as $c)
+              @php
+                $ini = $c->name ? mb_substr(trim($c->name), 0, 1) : '?';
+                $g = $custGrads[$loop->index % count($custGrads)];
+                $spent = (float) $c->spent;
+                $oc = (int) $c->orders_count;
+                $badge = ($spent >= 2500 || $oc >= 12) ? ['عميل VIP','b-green'] : (($oc >= 5) ? ['دائم','b-primary'] : (($oc >= 2) ? ['نشط','b-cyan'] : ['جديد','b-amber']));
+              @endphp
             <div class="cust-card">
-              <div class="cust-card-ava" style="background:linear-gradient(135deg,#f59e0b,#ef4444)">م</div>
+              <div class="cust-card-ava" style="background:{{ $g }}">{{ $ini }}</div>
               <div class="cust-card-info">
-                <div class="cust-card-name">منى كريم</div>
-                <div class="cust-card-meta">+966504567890 · الرياض</div>
-                <div style="margin-top:6px;"><span class="badge b-green">عميل VIP</span></div>
+                <div class="cust-card-name">{{ $c->name ?: '—' }}</div>
+                <div class="cust-card-meta">{{ $c->phone }}</div>
+                <div style="margin-top:6px;"><span class="badge {{ $badge[1] }}">{{ $badge[0] }}</span></div>
               </div>
               <div class="cust-card-stat">
-                <div class="cust-card-orders">18</div>
+                <div class="cust-card-orders">{{ $oc }}</div>
                 <div class="cust-card-slbl">طلب</div>
-                <div style="font-size:0.75rem;font-weight:800;color:var(--primary);margin-top:4px;">3,420 ر.س</div>
+                <div style="font-size:0.75rem;font-weight:800;color:var(--primary);margin-top:4px;">{{ number_format($spent, 0) }} ر.س</div>
               </div>
             </div>
-            <div class="cust-card">
-              <div class="cust-card-ava" style="background:linear-gradient(135deg,#6366f1,#8b5cf6)">أ</div>
-              <div class="cust-card-info">
-                <div class="cust-card-name">أحمد محمد</div>
-                <div class="cust-card-meta">+966501234567 · جدة</div>
-                <div style="margin-top:6px;"><span class="badge b-primary">دائم</span></div>
-              </div>
-              <div class="cust-card-stat">
-                <div class="cust-card-orders">14</div>
-                <div class="cust-card-slbl">طلب</div>
-                <div style="font-size:0.75rem;font-weight:800;color:var(--primary);margin-top:4px;">2,840 ر.س</div>
-              </div>
-            </div>
-            <div class="cust-card">
-              <div class="cust-card-ava" style="background:linear-gradient(135deg,#06b6d4,#6366f1)">س</div>
-              <div class="cust-card-info">
-                <div class="cust-card-name">سارة العمر</div>
-                <div class="cust-card-meta">+966502345678 · مكة</div>
-                <div style="margin-top:6px;"><span class="badge b-cyan">نشط</span></div>
-              </div>
-              <div class="cust-card-stat">
-                <div class="cust-card-orders">11</div>
-                <div class="cust-card-slbl">طلب</div>
-                <div style="font-size:0.75rem;font-weight:800;color:var(--primary);margin-top:4px;">1,960 ر.س</div>
-              </div>
-            </div>
+            @endforeach
           </div>
+          @endif
 
-          <!-- All customers table -->
           <div class="full-panel">
             <div class="panel-head">
               <span class="panel-title">جميع العملاء</span>
               <div style="display:flex;gap:8px;">
-                <button class="btn btn-ghost btn-sm">🔍 بحث</button>
-                <button class="btn btn-ghost btn-sm">📥 تصدير</button>
+                <button type="button" class="btn btn-ghost btn-sm" disabled title="قريباً">🔍 بحث</button>
+                <button type="button" class="btn btn-ghost btn-sm" disabled title="قريباً">📥 تصدير</button>
               </div>
             </div>
             <table>
@@ -2572,86 +2442,36 @@
                 </tr>
               </thead>
               <tbody>
+                @forelse($customerRows as $c)
+                @php
+                  $ini = $c->name ? mb_substr(trim($c->name), 0, 1) : '?';
+                  $g = $custGrads[$loop->index % count($custGrads)];
+                  $spent = (float) $c->spent;
+                  $oc = (int) $c->orders_count;
+                  $rowBadge = ($spent >= 2500 || $oc >= 12) ? ['VIP','b-green'] : (($oc >= 5) ? ['دائم','b-primary'] : (($oc >= 2) ? ['نشط','b-cyan'] : ['جديد','b-amber']));
+                  $last = $c->last_order_at ? \Illuminate\Support\Carbon::parse($c->last_order_at)->locale('ar')->translatedFormat('j M Y') : '—';
+                @endphp
                 <tr>
                   <td>
                     <div class="cust-cell">
-                      <div class="cust-ava" style="background:linear-gradient(135deg,#f59e0b,#ef4444)">م</div>
+                      <div class="cust-ava" style="background:{{ $g }}">{{ $ini }}</div>
                       <div>
-                        <div style="color:var(--t1);font-weight:700;font-size:0.83rem;">منى كريم</div>
+                        <div style="color:var(--t1);font-weight:700;font-size:0.83rem;">{{ $c->name ?: '—' }}</div>
                       </div>
                     </div>
                   </td>
-                  <td style="font-family:monospace;font-size:0.8rem;">+966504567890</td>
-                  <td>الرياض</td>
-                  <td style="font-weight:800;color:var(--t1);">18</td>
-                  <td><span class="amount">3,420 ر.س</span></td>
-                  <td style="font-size:0.78rem;">11 أبريل</td>
-                  <td><span class="badge b-green">VIP</span></td>
+                  <td style="font-family:monospace;font-size:0.8rem;">{{ $c->phone }}</td>
+                  <td style="color:var(--t3);">—</td>
+                  <td style="font-weight:800;color:var(--t1);">{{ $oc }}</td>
+                  <td><span class="amount">{{ number_format($spent, 0) }} ر.س</span></td>
+                  <td style="font-size:0.78rem;">{{ $last }}</td>
+                  <td><span class="badge {{ $rowBadge[1] }}">{{ $rowBadge[0] }}</span></td>
                 </tr>
+                @empty
                 <tr>
-                  <td>
-                    <div class="cust-cell">
-                      <div class="cust-ava" style="background:linear-gradient(135deg,#6366f1,#8b5cf6)">أ</div>
-                      <div>
-                        <div style="color:var(--t1);font-weight:700;font-size:0.83rem;">أحمد محمد</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td style="font-family:monospace;font-size:0.8rem;">+966501234567</td>
-                  <td>جدة</td>
-                  <td style="font-weight:800;color:var(--t1);">14</td>
-                  <td><span class="amount">2,840 ر.س</span></td>
-                  <td style="font-size:0.78rem;">11 أبريل</td>
-                  <td><span class="badge b-primary">دائم</span></td>
+                  <td colspan="7" style="text-align:center;padding:24px;color:var(--t2);">لا بيانات عملاء بعد.</td>
                 </tr>
-                <tr>
-                  <td>
-                    <div class="cust-cell">
-                      <div class="cust-ava" style="background:linear-gradient(135deg,#06b6d4,#6366f1)">س</div>
-                      <div>
-                        <div style="color:var(--t1);font-weight:700;font-size:0.83rem;">سارة العمر</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td style="font-family:monospace;font-size:0.8rem;">+966502345678</td>
-                  <td>مكة</td>
-                  <td style="font-weight:800;color:var(--t1);">11</td>
-                  <td><span class="amount">1,960 ر.س</span></td>
-                  <td style="font-size:0.78rem;">10 أبريل</td>
-                  <td><span class="badge b-cyan">نشط</span></td>
-                </tr>
-                <tr>
-                  <td>
-                    <div class="cust-cell">
-                      <div class="cust-ava" style="background:linear-gradient(135deg,#8b5cf6,#ec4899)">خ</div>
-                      <div>
-                        <div style="color:var(--t1);font-weight:700;font-size:0.83rem;">خالد الفارس</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td style="font-family:monospace;font-size:0.8rem;">+966503456789</td>
-                  <td>الدمام</td>
-                  <td style="font-weight:800;color:var(--t1);">7</td>
-                  <td><span class="amount">1,120 ر.س</span></td>
-                  <td style="font-size:0.78rem;">10 أبريل</td>
-                  <td><span class="badge b-amber">جديد</span></td>
-                </tr>
-                <tr>
-                  <td>
-                    <div class="cust-cell">
-                      <div class="cust-ava" style="background:linear-gradient(135deg,#10b981,#06b6d4)">ر</div>
-                      <div>
-                        <div style="color:var(--t1);font-weight:700;font-size:0.83rem;">ريم طارق</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td style="font-family:monospace;font-size:0.8rem;">+966505678901</td>
-                  <td>المدينة</td>
-                  <td style="font-weight:800;color:var(--t1);">3</td>
-                  <td><span class="amount">590 ر.س</span></td>
-                  <td style="font-size:0.78rem;">09 أبريل</td>
-                  <td><span class="badge b-red">غير نشط</span></td>
-                </tr>
+                @endforelse
               </tbody>
             </table>
           </div>
@@ -2701,24 +2521,15 @@
             <button class="btn btn-ghost btn-sm">📥 تصدير التقرير</button>
           </div>
 
-          <div class="reports-grid">
+          <div class="reports-grid" style="grid-template-columns:1fr;">
             <div class="chart-card">
               <div class="chart-top">
                 <div>
                   <div class="chart-title">المبيعات الأسبوعية</div>
-                  <div class="chart-sub">آخر 7 أسابيع</div>
+                  <div class="chart-sub">آخر 7 أسابيع (عرض توضيحي)</div>
                 </div>
               </div>
               <canvas id="reportWeekly"></canvas>
-            </div>
-            <div class="chart-card">
-              <div class="chart-top">
-                <div>
-                  <div class="chart-title">مصادر الطلبات</div>
-                  <div class="chart-sub">القناة التسويقية</div>
-                </div>
-              </div>
-              <canvas id="reportSource"></canvas>
             </div>
           </div>
 
@@ -2870,191 +2681,54 @@
             </div>
           </div>
 
-          <!-- Stats -->
-          <div class="stats-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:20px;">
-            <div class="stat-card s-indigo">
-              <div class="stat-icon si-indigo">🛒</div>
-              <div class="stat-val">8</div>
-              <div class="stat-lbl">سلات نشطة</div>
-              <span class="stat-change ch-up">↑ جديد اليوم</span>
-            </div>
-            <div class="stat-card s-amber">
-              <div class="stat-icon si-amber">⏳</div>
-              <div class="stat-val">23</div>
-              <div class="stat-lbl">سلات متروكة</div>
-              <span class="stat-change ch-down">↑ 3 اليوم</span>
-            </div>
-            <div class="stat-card s-green">
-              <div class="stat-icon si-green">✅</div>
-              <div class="stat-val">142</div>
-              <div class="stat-lbl">تم تحويلها لطلبات</div>
-              <span class="stat-change ch-up">↑ 18%</span>
-            </div>
-            <div class="stat-card s-cyan">
-              <div class="stat-icon si-cyan">💰</div>
-              <div class="stat-val">4,820</div>
-              <div class="stat-lbl">قيمة السلات النشطة (ر.س)</div>
-              <span class="stat-change ch-up">↑ 7.4%</span>
-            </div>
+          <!-- Filter bar -->
+          <div class="filter-bar" id="basket-filter-bar">
+            <button class="filter-tab active" data-status="" onclick="basketFilterClick(this)">الكل</button>
+            <button class="filter-tab" data-status="new" onclick="basketFilterClick(this)">جديد</button>
+            <button class="filter-tab" data-status="in_progress" onclick="basketFilterClick(this)">قيد التنفيذ</button>
+            <button class="filter-tab" data-status="shipped" onclick="basketFilterClick(this)">تم الشحن</button>
+            <button class="filter-tab" data-status="delivered" onclick="basketFilterClick(this)">تم التسليم</button>
+            <button class="filter-tab" data-status="canceled" onclick="basketFilterClick(this)">ملغي</button>
           </div>
 
-          <!-- Filter -->
-          <div class="filter-bar">
-            <button class="filter-tab active">الكل (173)</button>
-            <button class="filter-tab">نشطة (8)</button>
-            <button class="filter-tab">متروكة (23)</button>
-            <button class="filter-tab">أُرسل تذكير (41)</button>
-            <button class="filter-tab">تحولت لطلب (142) ✓</button>
+          <!-- Loading state -->
+          <div id="basket-loading" style="text-align:center;padding:60px 20px;color:var(--t2);">
+            <div style="font-size:2rem;margin-bottom:12px;">⏳</div>
+            <div>جاري تحميل الطلبات…</div>
           </div>
 
-          <!-- Basket orders table -->
-          <div class="full-panel">
-            <table>
-              <thead>
-                <tr>
-                  <th>رقم السلة</th>
-                  <th>العميل</th>
-                  <th>المنتجات</th>
-                  <th>قيمة السلة</th>
-                  <th>وقت الإنشاء</th>
-                  <th>حالة السلة</th>
-                  <th>إرسال أمر</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td><span class="order-id">#CART-081</span></td>
-                  <td>
-                    <div class="cust-cell">
-                      <div class="cust-ava" style="background:linear-gradient(135deg,#f59e0b,#ef4444)">م</div>
-                      <div>
-                        <div style="color:var(--t1);font-weight:600;font-size:0.83rem;">منى كريم</div>
-                        <div style="font-size:0.7rem;color:var(--t3);">+966504567890</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td>
-                    <div style="font-size:0.8rem;color:var(--t1);">فستان سواريه × 1</div>
-                    <div style="font-size:0.72rem;color:var(--t3);">حقيبة جلدية × 1</div>
-                  </td>
-                  <td><span class="amount">705 ر.س</span></td>
-                  <td style="font-size:0.78rem;">منذ 12 دقيقة</td>
-                  <td><span class="badge b-primary">🛒 نشطة</span></td>
-                  <td>
-                    <div style="display:flex;gap:6px;">
-                      <button class="btn btn-ghost btn-sm" style="font-size:0.72rem;"
-                        onclick="sendOrder(this,'#CART-081')">📤 إرسال</button>
-                    </div>
-                  </td>
-                </tr>
-                <tr>
-                  <td><span class="order-id">#CART-080</span></td>
-                  <td>
-                    <div class="cust-cell">
-                      <div class="cust-ava" style="background:linear-gradient(135deg,#6366f1,#8b5cf6)">أ</div>
-                      <div>
-                        <div style="color:var(--t1);font-weight:600;font-size:0.83rem;">أحمد محمد</div>
-                        <div style="font-size:0.7rem;color:var(--t3);">+966501234567</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td>
-                    <div style="font-size:0.8rem;color:var(--t1);">حذاء رياضي × 2</div>
-                  </td>
-                  <td><span class="amount">390 ر.س</span></td>
-                  <td style="font-size:0.78rem;">منذ 34 دقيقة</td>
-                  <td><span class="badge b-amber">⏳ متروكة</span></td>
-                  <td>
-                    <div style="display:flex;gap:6px;">
-                      <button class="btn btn-ghost btn-sm" style="font-size:0.72rem;"
-                        onclick="sendOrder(this,'#CART-080')">📤 إرسال</button>
-                      <button class="btn btn-ghost btn-sm" style="font-size:0.72rem;color:var(--amber);">💬
-                        تذكير</button>
-                    </div>
-                  </td>
-                </tr>
-                <tr>
-                  <td><span class="order-id">#CART-079</span></td>
-                  <td>
-                    <div class="cust-cell">
-                      <div class="cust-ava" style="background:linear-gradient(135deg,#06b6d4,#6366f1)">س</div>
-                      <div>
-                        <div style="color:var(--t1);font-weight:600;font-size:0.83rem;">سارة العمر</div>
-                        <div style="font-size:0.7rem;color:var(--t3);">+966502345678</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td>
-                    <div style="font-size:0.8rem;color:var(--t1);">طقم عباية × 1</div>
-                    <div style="font-size:0.72rem;color:var(--t3);">قبعة صيفية × 1</div>
-                  </td>
-                  <td><span class="amount">725 ر.س</span></td>
-                  <td style="font-size:0.78rem;">منذ ساعتين</td>
-                  <td><span class="badge b-amber">⏳ متروكة</span></td>
-                  <td>
-                    <div style="display:flex;gap:6px;">
-                      <button class="btn btn-ghost btn-sm" style="font-size:0.72rem;"
-                        onclick="sendOrder(this,'#CART-079')">📤 إرسال</button>
-                      <button class="btn btn-ghost btn-sm" style="font-size:0.72rem;color:var(--amber);">💬
-                        تذكير</button>
-                    </div>
-                  </td>
-                </tr>
-                <tr>
-                  <td><span class="order-id">#CART-078</span></td>
-                  <td>
-                    <div class="cust-cell">
-                      <div class="cust-ava" style="background:linear-gradient(135deg,#8b5cf6,#ec4899)">خ</div>
-                      <div>
-                        <div style="color:var(--t1);font-weight:600;font-size:0.83rem;">خالد الفارس</div>
-                        <div style="font-size:0.7rem;color:var(--t3);">+966503456789</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td>
-                    <div style="font-size:0.8rem;color:var(--t1);">بلوزة كاجوال × 3</div>
-                  </td>
-                  <td><span class="amount">267 ر.س</span></td>
-                  <td style="font-size:0.78rem;">منذ 3 ساعات</td>
-                  <td><span class="badge b-green">✓ تحول لطلب</span></td>
-                  <td>
-                    <span style="font-size:0.78rem;color:var(--green);">✓ #WZ-1092</span>
-                  </td>
-                </tr>
-                <tr>
-                  <td><span class="order-id">#CART-077</span></td>
-                  <td>
-                    <div class="cust-cell">
-                      <div class="cust-ava" style="background:linear-gradient(135deg,#10b981,#06b6d4)">ر</div>
-                      <div>
-                        <div style="color:var(--t1);font-weight:600;font-size:0.83rem;">ريم طارق</div>
-                        <div style="font-size:0.7rem;color:var(--t3);">+966505678901</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td>
-                    <div style="font-size:0.8rem;color:var(--t1);">محفظة نسائية × 1</div>
-                    <div style="font-size:0.72rem;color:var(--t3);">طقم إكسسوار × 1</div>
-                  </td>
-                  <td><span class="amount">460 ر.س</span></td>
-                  <td style="font-size:0.78rem;">منذ 4 ساعات</td>
-                  <td><span class="badge b-cyan">📤 أُرسل تذكير</span></td>
-                  <td>
-                    <div style="display:flex;gap:6px;">
-                      <button class="btn btn-ghost btn-sm" style="font-size:0.72rem;"
-                        onclick="sendOrder(this,'#CART-077')">📤 إرسال</button>
-                    </div>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+          <!-- Error state -->
+          <div id="basket-error" style="display:none;text-align:center;padding:60px 20px;color:var(--t2);">
+            <div style="font-size:2rem;margin-bottom:12px;">⚠️</div>
+            <div id="basket-error-msg">حدث خطأ أثناء التحميل</div>
+            <button class="btn btn-ghost btn-sm" style="margin-top:14px;" onclick="loadBasketOrders(1)">إعادة المحاولة</button>
           </div>
 
-          <!-- Quick send order modal-like panel -->
-          <div id="orderSentAlert"
-            style="display:none;position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1a2535;border:1px solid var(--green);border-radius:12px;padding:14px 24px;z-index:999;display:none;align-items:center;gap:10px;box-shadow:0 8px 32px rgba(0,0,0,0.5);">
-            <span style="font-size:1.2rem;">✅</span>
-            <span id="orderSentMsg" style="font-size:0.875rem;color:var(--t1);font-weight:700;"></span>
+          <!-- Orders table -->
+          <div id="basket-table-wrap" style="display:none;">
+            <div class="full-panel">
+              <table>
+                <thead>
+                  <tr>
+                    <th>رقم الطلب</th>
+                    <th>العميل</th>
+                    <th>المنتجات</th>
+                    <th>الإجمالي</th>
+                    <th>تاريخ الطلب</th>
+                    <th>الحالة</th>
+                    <th>واتساب</th>
+                  </tr>
+                </thead>
+                <tbody id="basket-orders-tbody"></tbody>
+              </table>
+            </div>
+            <!-- Pagination -->
+            <div id="basket-pagination" style="display:none;justify-content:center;align-items:center;gap:12px;margin-top:16px;">
+              <button id="basket-prev" class="btn btn-ghost btn-sm" onclick="loadBasketOrders(basketPage-1)">السابق</button>
+              <span id="basket-page-info" style="font-size:0.82rem;color:var(--t2);"></span>
+              <button id="basket-next" class="btn btn-ghost btn-sm" onclick="loadBasketOrders(basketPage+1)">التالي</button>
+            </div>
+            <div id="basket-sub" style="text-align:center;font-size:0.78rem;color:var(--t3);margin-top:8px;"></div>
           </div>
         </div><!-- /page-basket-orders -->
 
@@ -3523,22 +3197,6 @@
             </div>
           </div>
 
-          <!-- AI Status bar -->
-          <div
-            style="padding:14px 18px;background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.2);border-radius:var(--r);margin-bottom:20px;display:flex;align-items:center;gap:14px;">
-            <div
-              style="width:40px;height:40px;border-radius:10px;background:rgba(99,102,241,0.2);display:flex;align-items:center;justify-content:center;font-size:1.3rem;flex-shrink:0;">
-              🤖</div>
-            <div style="flex:1;">
-              <div style="font-size:0.875rem;font-weight:800;color:var(--t1);">البوت نشط ومُدرَّب</div>
-              <div style="font-size:0.75rem;color:var(--t2);margin-top:2px;">آخر تدريب: 10 أبريل 2025 · دقة الإجابة:
-                <strong style="color:var(--green);">94%</strong></div>
-            </div>
-            <div style="display:flex;gap:8px;">
-              <span class="badge b-green">● نشط</span>
-              <span class="badge b-primary">GPT-4 Turbo</span>
-            </div>
-          </div>
 
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
 
@@ -3580,14 +3238,55 @@
                 </div>
               </div>
 
-              <!-- Support phone -->
+              <!-- Support Transfer -->
               <div class="full-panel">
-                <div class="panel-head"><span class="panel-title">📞 رقم الدعم البشري</span></div>
-                <div style="padding:14px 20px;">
-                  <div class="wa-form-group">
-                    <label class="wa-label">رقم الواتساب للتحويل عند طلب الدعم</label>
-                    <input id="ai_support_phone" class="wa-input" type="text" placeholder="مثال: 966512345678 (بدون +)" />
-                    <div style="font-size:0.75rem;color:var(--t3);margin-top:6px;">عندما يطلب العميل التحدث مع موظف أو دعم بشري، سيرسل له البوت هذا الرقم تلقائياً.</div>
+                <div class="panel-head"><span class="panel-title">🙋 تحويل للدعم البشري</span></div>
+                <div style="padding:14px 20px;display:flex;flex-direction:column;gap:14px;">
+                  <div class="wa-form-group" style="margin:0;">
+                    <label class="wa-label">رقم واتساب الدعم (بدون +)</label>
+                    <input id="ai_support_phone" class="wa-input" type="text" placeholder="مثال: 966512345678" />
+                    <div style="font-size:0.75rem;color:var(--t3);margin-top:6px;">عندما يطلب العميل موظف أو دعم، يسأله البوت عن سببه ثم يحوّله ويوقف الذكاء تلقائياً.</div>
+                  </div>
+                  <div style="background:var(--bg);border:1px solid var(--border);border-radius:var(--r);padding:12px 14px;">
+                    <div style="font-size:0.78rem;color:var(--t2);margin-bottom:8px;font-weight:600;">مثال على سير المحادثة:</div>
+                    <div style="font-size:0.75rem;color:var(--t3);line-height:1.7;">
+                      👤 العميل: <span style="color:var(--t1);">"أبغى موظف"</span><br>
+                      🤖 البوت: <span style="color:var(--green);">"اكتب سبب طلب الدعم باختصار..."</span><br>
+                      👤 العميل: <span style="color:var(--t1);">"طلبي تأخر ٣ أيام"</span><br>
+                      🤖 البوت → يرسل للدعم: <span style="color:var(--cyan);">🚨 طلب دعم | العميل: +966XXXXXXX | السبب: طلبي تأخر...</span><br>
+                      🤖 البوت → للعميل: <span style="color:var(--green);">"تم تحويل طلبك ✅ الرجاء الانتظار..."</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Merchant Order Notifications -->
+              <div class="full-panel">
+                <div class="panel-head"><span class="panel-title">🔔 إشعارات التاجر</span></div>
+                <div style="padding:14px 20px;display:flex;flex-direction:column;gap:14px;">
+                  <div class="wa-toggle-row" style="margin:0;">
+                    <div>
+                      <div class="wa-toggle-txt">إشعار عند كل طلب جديد</div>
+                      <div class="wa-toggle-sub">يرسل البوت تفاصيل الطلب فور إنشائه في المتجر</div>
+                    </div>
+                    <div id="tog_notify_orders" class="toggle off" onclick="this.classList.toggle('on');this.classList.toggle('off')">
+                      <div class="toggle-knob"></div>
+                    </div>
+                  </div>
+                  <div class="wa-form-group" style="margin:0;">
+                    <label class="wa-label">أرقام استقبال الإشعارات (بدون +)</label>
+                    <input id="notify_phone" class="wa-input" type="text" placeholder="مثال: 966512345678, 966509876543" />
+                    <div style="font-size:0.75rem;color:var(--t3);margin-top:6px;">يمكن إدخال أكثر من رقم مفصولة بفاصلة. الإشعار يصل فور وصول أي طلب جديد.</div>
+                  </div>
+                  <div style="background:var(--bg);border:1px solid var(--border);border-radius:var(--r);padding:12px 14px;">
+                    <div style="font-size:0.78rem;color:var(--t2);margin-bottom:6px;font-weight:600;">مثال على رسالة الإشعار:</div>
+                    <div style="font-size:0.75rem;color:var(--t3);line-height:1.9;white-space:pre-line;">🛒 <b style="color:var(--t1);">طلب جديد</b>
+
+👤 العميل: فيصل العمري
+📱 الرقم: +966512345678
+📦 الطلب: سماعة بلوتوث × 1
+💰 المبلغ: 149 ريال
+📍 المدينة: الرياض</div>
                   </div>
                 </div>
               </div>
@@ -3815,7 +3514,7 @@
                   <div class="wa-form-group">
                     <label class="wa-label">📞 اختيار رقم لإرسال من خلاله الإشعارات</label>
                     <select class="wa-input" style="cursor:pointer;">
-                      <option>+966580378050 — (متصل)</option>
+                      <option>{{ $wzSupportPhone !== '' ? $wzSupportPhone.' — (من إعدادات تدريب البوت)' : 'حدّد رقم الدعم من صفحة «تدريب الذكاء» ثم اربط الواتساب' }}</option>
                       <option>+ إضافة رقم جديد</option>
                     </select>
                   </div>
@@ -3870,10 +3569,46 @@
 المبلغ: @{{order_total}} ر.س
 سنبدأ بتجهيز طلبك قريباً ✨</textarea>
                   </div>
-                  <div style="font-size:0.72rem;color:var(--t3);margin-bottom:12px;">المتغيرات: @{{customer_name}}
-                    @{{store_name}} @{{order_id}} @{{order_total}}</div>
+                  <div style="font-size:0.72rem;color:var(--t3);margin-bottom:12px;line-height:1.9;">
+                    المتغيرات المتاحة:<br>
+                    <code style="background:rgba(255,255,255,0.06);padding:1px 5px;border-radius:4px;">@{{customer_name}}</code> اسم العميل &nbsp;
+                    <code style="background:rgba(255,255,255,0.06);padding:1px 5px;border-radius:4px;">@{{order_id}}</code> رقم الطلب &nbsp;
+                    <code style="background:rgba(255,255,255,0.06);padding:1px 5px;border-radius:4px;">@{{order_total}}</code> الإجمالي &nbsp;
+                    <code style="background:rgba(255,255,255,0.06);padding:1px 5px;border-radius:4px;">@{{store_name}}</code> اسم المتجر &nbsp;
+                    <code style="background:rgba(255,255,255,0.06);padding:1px 5px;border-radius:4px;">@{{store_phone}}</code> رقم الدعم
+                  </div>
                   <button class="btn btn-ghost btn-sm" style="width:100%;" onclick="previewTemplate('تأكيد الطلب')">👁️
                     معاينة</button>
+                </div>
+              </div>
+
+              <div class="full-panel">
+                <div class="panel-head">
+                  <span class="panel-title">💵 الدفع عند الاستلام (COD)</span>
+                  <div id="tog_cod_enabled" class="toggle off" onclick="this.classList.toggle('on');this.classList.toggle('off')">
+                    <div class="toggle-knob"></div>
+                  </div>
+                </div>
+                <div style="padding:18px 20px;">
+                  <div style="background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.2);border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:0.78rem;color:#fde68a;line-height:1.7;">
+                    تُرسل هذه الرسالة تلقائياً لأي عميل يختار طريقة الدفع عند الاستلام — تذكّره بأنه سيتم التواصل معه لتأكيد الطلب قبل الشحن.
+                  </div>
+                  <div class="wa-form-group">
+                    <label class="wa-label">نص رسالة COD</label>
+                    <textarea id="msg_cod" class="wa-input wa-textarea">📦 تم استلام طلبك بنجاح
+
+طلبك حاليًا قيد التجهيز 🙏
+بما أن طريقة الدفع هي الدفع عند الاستلام،
+سيتم التواصل معك لتأكيد الطلب قبل الشحن.
+
+شكراً لثقتك ❤️</textarea>
+                  </div>
+                  <div style="font-size:0.72rem;color:var(--t3);margin-bottom:12px;line-height:1.8;">
+                    المتغيرات: <code style="background:rgba(255,255,255,0.06);padding:1px 5px;border-radius:4px;">@{{customer_name}}</code>
+                    <code style="background:rgba(255,255,255,0.06);padding:1px 5px;border-radius:4px;">@{{order_id}}</code>
+                    <code style="background:rgba(255,255,255,0.06);padding:1px 5px;border-radius:4px;">@{{order_total}}</code>
+                    <code style="background:rgba(255,255,255,0.06);padding:1px 5px;border-radius:4px;">@{{store_name}}</code>
+                  </div>
                 </div>
               </div>
 
@@ -4146,7 +3881,7 @@
                 <div style="padding:18px 20px;">
                   <div class="wa-form-group">
                     <label class="wa-label">رقم الواتساب للويدجت</label>
-                    <input class="wa-input" type="text" value="+966580378050" />
+                    <input id="tpl_widget_phone" class="wa-input" type="text" value="{{ $wzSupportPhone }}" placeholder="+9665xxxxxxxx" />
                   </div>
                   <div class="wa-form-group">
                     <label class="wa-label">رسالة الترحيب المبدئية</label>
@@ -4184,7 +3919,7 @@
                   <div
                     style="background:var(--bg);border:1px solid var(--border);border-radius:var(--r);padding:14px;font-family:monospace;font-size:0.78rem;color:#a5b4fc;line-height:1.6;white-space:pre-wrap;">
                     &lt;script src="https://wayzon.sa/widget.js"
-                    data-phone="+966580378050"
+                    data-phone="{{ $wzSupportPhone }}"
                     data-position="bottom-right"&gt;
                     &lt;/script&gt;</div>
                   <button class="btn btn-ghost btn-sm" style="width:100%;margin-top:12px;"
@@ -4291,11 +4026,7 @@
               @elseif(auth()->user()->pending_plan === 'basic')
                 <button class="plan-btn" style="background:rgba(245,158,11,0.15);color:#f59e0b;border:1px solid rgba(245,158,11,0.3);cursor:default;">⏳ بانتظار الدفع</button>
               @else
-                <form method="POST" action="{{ route('plan.change') }}">
-                  @csrf
-                  <input type="hidden" name="plan" value="basic">
-                  <button type="submit" class="plan-btn plan-btn-upgrade" style="background:rgba(255,255,255,0.07);color:#f0f4ff;box-shadow:none;">الانتقال لهذه الخطة</button>
-                </form>
+                <a href="https://apps.salla.sa/ar/app/1819242470" target="_blank" class="plan-btn plan-btn-upgrade" style="background:rgba(255,255,255,0.07);color:#f0f4ff;box-shadow:none;display:block;text-align:center;text-decoration:none;">الانتقال لهذه الخطة</a>
               @endif
             </div>
 
@@ -4319,11 +4050,7 @@
               @elseif(auth()->user()->pending_plan === 'smart')
                 <button class="plan-btn" style="background:rgba(245,158,11,0.15);color:#f59e0b;border:1px solid rgba(245,158,11,0.3);cursor:default;">⏳ بانتظار الدفع</button>
               @else
-                <form method="POST" action="{{ route('plan.change') }}">
-                  @csrf
-                  <input type="hidden" name="plan" value="smart">
-                  <button type="submit" class="plan-btn plan-btn-upgrade">ترقية الآن ←</button>
-                </form>
+                <a href="https://apps.salla.sa/ar/app/1819242470" target="_blank" class="plan-btn plan-btn-upgrade" style="display:block;text-align:center;text-decoration:none;">ترقية الآن ←</a>
               @endif
             </div>
 
@@ -4345,11 +4072,7 @@
               @elseif(auth()->user()->pending_plan === 'pro')
                 <button class="plan-btn" style="background:rgba(245,158,11,0.15);color:#f59e0b;border:1px solid rgba(245,158,11,0.3);cursor:default;">⏳ بانتظار الدفع</button>
               @else
-                <form method="POST" action="{{ route('plan.change') }}">
-                  @csrf
-                  <input type="hidden" name="plan" value="pro">
-                  <button type="submit" class="plan-btn plan-btn-pro">ترقية الآن ←</button>
-                </form>
+                <a href="https://apps.salla.sa/ar/app/1819242470" target="_blank" class="plan-btn plan-btn-pro" style="display:block;text-align:center;text-decoration:none;">ترقية الآن ←</a>
               @endif
             </div>
 
@@ -4520,6 +4243,7 @@
 
   <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script>
   <script>
+    window.WZ_STORE_PHONE = @json($wzSupportPhone);
     // ── Page switching ──
     function toggleSidebar() {
       const s = document.getElementById('sidebar');
@@ -4555,6 +4279,10 @@
 
       // Load real products from Salla lazily
       if (pageName === 'products' && !productsLoaded) loadProducts(1);
+
+      // Load real orders from Salla lazily
+      if (pageName === 'basket-orders' && !basketOrdersLoaded) loadBasketOrders(1);
+      if (pageName === 'orders' && !merchantOrdersLoaded) loadMerchantOrders(1);
     }
     function switchPageByName(name) {
       const el = document.querySelector('[data-page="' + name + '"]');
@@ -4585,11 +4313,11 @@
     Chart.defaults.color = '#94a3b8';
     Chart.defaults.font = { family: "'Tajawal', sans-serif" };
 
-    // ── Sales chart ──
+    // ── Sales chart (from Wayzon DB — synced via Salla webhooks) ──
     const salesCtx = document.getElementById('salesChart').getContext('2d');
-    const labels = Array.from({ length: 30 }, (_, i) => (i + 1) + '');
-    const salesData = [820, 740, 890, 960, 1100, 980, 1050, 1200, 1080, 1320, 1150, 990, 1400, 1350, 1280, 1500, 1420, 1380, 1600, 1520, 1480, 1700, 1650, 1580, 1900, 1820, 1760, 2100, 1980, 2200];
-    const ordersData = [12, 10, 14, 15, 18, 14, 16, 20, 17, 22, 19, 16, 24, 21, 20, 25, 23, 22, 27, 26, 24, 29, 28, 26, 32, 30, 29, 35, 33, 34];
+    const labels = @json($chartLabels);
+    const salesData = @json($chartSales);
+    const ordersData = @json($chartOrders);
 
     const sg = salesCtx.createLinearGradient(0, 0, 0, 210);
     sg.addColorStop(0, 'rgba(99,102,241,0.28)');
@@ -4615,13 +4343,14 @@
       }
     });
 
-    // ── Category donut ──
+    // ── Category donut (from order line items in Wayzon DB) ──
+    const categoryChartMeta = @json($categoryChart);
     const catCtx = document.getElementById('categoryChart').getContext('2d');
     new Chart(catCtx, {
       type: 'doughnut',
       data: {
-        labels: ['ملابس', 'إكسسوارات', 'أحذية', 'أخرى'],
-        datasets: [{ data: [42, 28, 18, 12], backgroundColor: ['#6366f1', '#10b981', '#f59e0b', '#8b5cf6'], borderWidth: 3, borderColor: '#161b24', hoverOffset: 5 }]
+        labels: categoryChartMeta.map(c => c.name),
+        datasets: [{ data: categoryChartMeta.map(c => c.pct), backgroundColor: categoryChartMeta.map(c => c.color), borderWidth: 3, borderColor: '#161b24', hoverOffset: 5 }]
       },
       options: {
         responsive: true, cutout: '72%',
@@ -4631,8 +4360,9 @@
 
     // ── Report charts ──
     function initReportCharts() {
-      // Weekly bar
-      const rwCtx = document.getElementById('reportWeekly').getContext('2d');
+      const rwEl = document.getElementById('reportWeekly');
+      if (!rwEl) return;
+      const rwCtx = rwEl.getContext('2d');
       new Chart(rwCtx, {
         type: 'bar',
         data: {
@@ -4643,23 +4373,6 @@
           responsive: true,
           plugins: { legend: { display: false }, tooltip: { backgroundColor: '#1a1f2e', borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1 } },
           scales: { x: { grid: { color: 'rgba(255,255,255,0.04)' } }, y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { callback: v => v >= 1000 ? (v / 1000).toFixed(1) + 'K' : v } } }
-        }
-      });
-
-      // Source doughnut
-      const rsCtx = document.getElementById('reportSource').getContext('2d');
-      new Chart(rsCtx, {
-        type: 'doughnut',
-        data: {
-          labels: ['واتساب', 'تيك توك', 'إنستغرام', 'مباشر', 'أخرى'],
-          datasets: [{ data: [38, 24, 20, 12, 6], backgroundColor: ['#10b981', '#6366f1', '#f59e0b', '#06b6d4', '#8b5cf6'], borderWidth: 3, borderColor: '#161b24', hoverOffset: 5 }]
-        },
-        options: {
-          responsive: true, cutout: '65%',
-          plugins: {
-            legend: { display: true, position: 'bottom', labels: { font: { size: 11 }, color: '#94a3b8', padding: 12, usePointStyle: true } },
-            tooltip: { backgroundColor: '#1a1f2e', borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1, callbacks: { label: ctx => ` ${ctx.label}: ${ctx.parsed}%` } }
-          }
         }
       });
     }
@@ -4730,7 +4443,7 @@
         .replace(/@{{customer_phone}}/g, '+966504567890')
         .replace(/@{{payment_method}}/g, 'بطاقة بنكية')
         .replace(/@{{stock_count}}/g, '3')
-        .replace(/@{{store_phone}}/g, '+966580378050');
+        .replace(/@{{store_phone}}/g, window.WZ_STORE_PHONE || '—');
       document.getElementById('previewContent').textContent = preview;
       document.getElementById('previewModal').style.display = 'flex';
     }
@@ -4746,6 +4459,8 @@
         msg_order_shipped:   document.getElementById('msg_order_shipped')?.value  || '',
         msg_order_delivered: document.getElementById('msg_order_delivered')?.value || '',
         msg_order_canceled:  document.getElementById('msg_order_canceled')?.value  || '',
+        cod_enabled:         document.getElementById('tog_cod_enabled')?.classList.contains('on') || false,
+        msg_cod:             document.getElementById('msg_cod')?.value || '',
       };
 
       try {
@@ -4855,10 +4570,12 @@
         const colors = ['rgba(99,102,241,0.08)', 'rgba(16,185,129,0.08)', 'rgba(245,158,11,0.08)', 'rgba(139,92,246,0.08)', 'rgba(6,182,212,0.08)', 'rgba(239,68,68,0.08)'];
         const grid = document.getElementById('products-grid');
         grid.innerHTML = data.products.map((p, i) => {
-          const stockHtml = p.stock === null ? '' :
-            p.stock > 5 ? `<span class="prod-stock ok">✓ ${p.stock} قطعة</span>` :
-            p.stock > 0 ? `<span class="prod-stock low">⚠ ${p.stock} قطع فقط</span>` :
-                          `<span class="prod-stock low">نفد المخزون</span>`;
+          let stockHtml = '';
+          if (p.unlimited) stockHtml = '<span class="prod-stock ok">✓ متوفر</span>';
+          else if (p.in_stock && (p.stock === null || p.stock === undefined)) stockHtml = '<span class="prod-stock ok">✓ متوفر</span>';
+          else if (p.in_stock && p.stock > 5) stockHtml = '<span class="prod-stock ok">✓ ' + p.stock + ' قطعة</span>';
+          else if (p.in_stock && p.stock > 0) stockHtml = '<span class="prod-stock low">⚠ ' + p.stock + ' قطع فقط</span>';
+          else stockHtml = '<span class="prod-stock low">غير متوفر</span>';
           const imgHtml = p.image
             ? `<img src="${p.image}" style="width:100%;height:100%;object-fit:cover;border-radius:8px;" loading="lazy" />`
             : `<span style="font-size:2rem;">🛍️</span>`;
@@ -4894,6 +4611,229 @@
         document.getElementById('products-loading').style.display = 'none';
         document.getElementById('products-error-msg').textContent = 'حدث خطأ أثناء التحميل';
         document.getElementById('products-error').style.display = '';
+      }
+    }
+
+    // ── Basket Orders — load from Salla ──
+    const ORDERS_URL = '{{ route("salla.orders") }}';
+    let basketPage = 1;
+    let basketOrdersLoaded = false;
+    let basketStatusFilter = '';
+
+    let merchantOrdersPage = 1;
+    let merchantOrdersLoaded = false;
+    let merchantOrdersStatusFilter = '';
+
+    function merchantOrdersFilterClick(btn) {
+      document.querySelectorAll('#orders-filter-bar .filter-tab').forEach(t => t.classList.remove('active'));
+      btn.classList.add('active');
+      merchantOrdersStatusFilter = btn.dataset.status || '';
+      merchantOrdersLoaded = false;
+      loadMerchantOrders(1);
+    }
+
+    function basketFilterClick(btn) {
+      document.querySelectorAll('#basket-filter-bar .filter-tab').forEach(t => t.classList.remove('active'));
+      btn.classList.add('active');
+      basketStatusFilter = btn.dataset.status || '';
+      basketOrdersLoaded = false;
+      loadBasketOrders(1);
+    }
+
+    const statusBadgeMap = {
+      new: 'b-primary', in_progress: 'b-primary', paid: 'b-primary', payment_confirmed: 'b-primary',
+      pending_payment: 'b-amber', under_review: 'b-amber', pending_review: 'b-amber',
+      shipped: 'b-cyan', delivering: 'b-cyan', out_for_delivery: 'b-cyan',
+      delivered: 'b-green', canceled: 'b-red', returned: 'b-red', refunded: 'b-red',
+    };
+    const statusLabelMap = {
+      new: 'جديد', in_progress: 'قيد التنفيذ', paid: 'مدفوع', payment_confirmed: 'مؤكد الدفع',
+      pending_payment: 'بانتظار الدفع', under_review: 'قيد المراجعة',
+      shipped: 'تم الشحن', delivering: 'جاري التوصيل', out_for_delivery: 'في الطريق',
+      delivered: 'تم التسليم', canceled: 'ملغي', returned: 'مُسترجع', refunded: 'مُسترد',
+    };
+
+    async function loadBasketOrders(page = 1) {
+      basketPage = page;
+      document.getElementById('basket-loading').style.display = '';
+      document.getElementById('basket-error').style.display = 'none';
+      document.getElementById('basket-table-wrap').style.display = 'none';
+
+      try {
+        let url = ORDERS_URL + '?page=' + page;
+        if (basketStatusFilter) url += '&status=' + encodeURIComponent(basketStatusFilter);
+        const res  = await fetch(url);
+        const data = await res.json();
+
+        document.getElementById('basket-loading').style.display = 'none';
+
+        if (!data.success) {
+          document.getElementById('basket-error-msg').textContent =
+            data.error === 'no_store' ? 'لم يتم ربط متجر سلة بعد' : 'حدث خطأ أثناء تحميل الطلبات';
+          document.getElementById('basket-error').style.display = '';
+          return;
+        }
+
+        if (!data.orders?.length) {
+          document.getElementById('basket-error-msg').textContent = 'لا توجد طلبات';
+          document.getElementById('basket-error').style.display = '';
+          return;
+        }
+
+        const avatarColors = [
+          'linear-gradient(135deg,#6366f1,#8b5cf6)',
+          'linear-gradient(135deg,#10b981,#06b6d4)',
+          'linear-gradient(135deg,#f59e0b,#ef4444)',
+          'linear-gradient(135deg,#06b6d4,#6366f1)',
+          'linear-gradient(135deg,#8b5cf6,#ec4899)',
+        ];
+
+        const tbody = document.getElementById('basket-orders-tbody');
+        tbody.innerHTML = data.orders.map((o, i) => {
+          const name    = o.customer_name || 'عميل';
+          const initial = name.charAt(0);
+          const color   = avatarColors[i % avatarColors.length];
+          const badge   = statusBadgeMap[o.status] || 'b-primary';
+          const label   = o.status_label || statusLabelMap[o.status] || o.status;
+          const date    = o.created_at ? new Date(o.created_at).toLocaleDateString('ar-SA') : '—';
+          const phone   = o.customer_phone || '';
+          const products= o.products || '—';
+          const waBtn   = phone
+            ? `<a href="https://wa.me/${phone}" target="_blank" class="btn btn-ghost btn-sm" style="font-size:0.72rem;">💬 واتساب</a>`
+            : `<span style="font-size:0.75rem;color:var(--t3);">—</span>`;
+          return `
+            <tr>
+              <td><span class="order-id">#${o.reference_id || o.id}</span></td>
+              <td>
+                <div class="cust-cell">
+                  <div class="cust-ava" style="background:${color}">${initial}</div>
+                  <div>
+                    <div style="color:var(--t1);font-weight:600;font-size:0.83rem;">${name}</div>
+                    ${phone ? `<div style="font-size:0.7rem;color:var(--t3);">+${phone}</div>` : ''}
+                  </div>
+                </div>
+              </td>
+              <td style="font-size:0.8rem;max-width:180px;white-space:normal;line-height:1.5;">${products}</td>
+              <td><span class="amount">${o.total} ر.س</span></td>
+              <td style="font-size:0.78rem;">${date}</td>
+              <td><span class="badge ${badge}">${label}</span></td>
+              <td>${waBtn}</td>
+            </tr>`;
+        }).join('');
+
+        document.getElementById('basket-table-wrap').style.display = '';
+        document.getElementById('basket-sub').textContent =
+          `${data.total} طلب · صفحة ${data.page} من ${data.last_page}`;
+
+        const pag = document.getElementById('basket-pagination');
+        if (data.last_page > 1) {
+          pag.style.display = 'flex';
+          document.getElementById('basket-page-info').textContent = `${data.page} / ${data.last_page}`;
+          document.getElementById('basket-prev').disabled = data.page <= 1;
+          document.getElementById('basket-next').disabled = data.page >= data.last_page;
+        } else {
+          pag.style.display = 'none';
+        }
+
+        basketOrdersLoaded = true;
+      } catch (e) {
+        document.getElementById('basket-loading').style.display = 'none';
+        document.getElementById('basket-error-msg').textContent = 'حدث خطأ أثناء التحميل';
+        document.getElementById('basket-error').style.display = '';
+      }
+    }
+
+    async function loadMerchantOrders(page = 1) {
+      merchantOrdersPage = page;
+      const sub = document.getElementById('orders-page-sub');
+      document.getElementById('orders-loading').style.display = '';
+      document.getElementById('orders-error').style.display = 'none';
+      document.getElementById('orders-table-wrap').style.display = 'none';
+
+      try {
+        let url = ORDERS_URL + '?page=' + page;
+        if (merchantOrdersStatusFilter) url += '&status=' + encodeURIComponent(merchantOrdersStatusFilter);
+        const res = await fetch(url);
+        const data = await res.json();
+
+        document.getElementById('orders-loading').style.display = 'none';
+
+        if (!data.success) {
+          document.getElementById('orders-error-msg').textContent =
+            data.error === 'no_store' ? 'لم يتم ربط متجر سلة بعد' : 'حدث خطأ أثناء تحميل الطلبات';
+          document.getElementById('orders-error').style.display = '';
+          if (sub) sub.textContent = 'تعذّر تحميل الطلبات من سلة';
+          return;
+        }
+
+        if (sub) sub.textContent = 'إجمالي ' + (data.total ?? 0) + ' طلب من متجر سلة';
+
+        if (!data.orders?.length) {
+          const tbody = document.getElementById('merchant-orders-tbody');
+          tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--t3);padding:32px;">لا توجد طلبات</td></tr>';
+          document.getElementById('orders-table-wrap').style.display = '';
+          document.getElementById('orders-sub').textContent = (data.total || 0) + ' طلب';
+          document.getElementById('orders-pagination').style.display = 'none';
+          merchantOrdersLoaded = true;
+          return;
+        }
+
+        document.getElementById('orders-error').style.display = 'none';
+
+        const avatarColors = [
+          'linear-gradient(135deg,#6366f1,#8b5cf6)',
+          'linear-gradient(135deg,#10b981,#06b6d4)',
+          'linear-gradient(135deg,#f59e0b,#ef4444)',
+          'linear-gradient(135deg,#06b6d4,#6366f1)',
+          'linear-gradient(135deg,#8b5cf6,#ec4899)',
+        ];
+
+        const tbody = document.getElementById('merchant-orders-tbody');
+        tbody.innerHTML = data.orders.map((o, i) => {
+          const name = o.customer_name || 'عميل';
+          const initial = name.charAt(0);
+          const color = avatarColors[i % avatarColors.length];
+          const badge = statusBadgeMap[o.status] || 'b-primary';
+          const label = o.status_label || statusLabelMap[o.status] || o.status;
+          const date = o.created_at ? new Date(o.created_at).toLocaleDateString('ar-SA') : '—';
+          const phone = o.customer_phone || '';
+          const products = o.products || '—';
+          const waBtn = phone
+            ? '<a href="https://wa.me/' + phone + '" target="_blank" class="btn btn-ghost btn-sm" style="font-size:0.72rem;">💬 واتساب</a>'
+            : '<span style="font-size:0.75rem;color:var(--t3);">—</span>';
+          return '<tr>' +
+            '<td><span class="order-id">#' + (o.reference_id || o.id) + '</span></td>' +
+            '<td><div class="cust-cell"><div class="cust-ava" style="background:' + color + '">' + initial + '</div>' +
+            '<div><div style="color:var(--t1);font-weight:600;font-size:0.83rem;">' + name + '</div>' +
+            (phone ? '<div style="font-size:0.7rem;color:var(--t3);">+' + phone + '</div>' : '') +
+            '</div></div></td>' +
+            '<td style="font-size:0.8rem;max-width:180px;white-space:normal;line-height:1.5;">' + products + '</td>' +
+            '<td><span class="amount">' + o.total + ' ر.س</span></td>' +
+            '<td style="font-size:0.78rem;">' + date + '</td>' +
+            '<td><span class="badge ' + badge + '">' + label + '</span></td>' +
+            '<td>' + waBtn + '</td></tr>';
+        }).join('');
+
+        document.getElementById('orders-table-wrap').style.display = '';
+        document.getElementById('orders-sub').textContent =
+          data.total + ' طلب · صفحة ' + data.page + ' من ' + data.last_page;
+
+        const pag = document.getElementById('orders-pagination');
+        if (data.last_page > 1) {
+          pag.style.display = 'flex';
+          document.getElementById('orders-page-info').textContent = data.page + ' / ' + data.last_page;
+          document.getElementById('orders-prev').disabled = data.page <= 1;
+          document.getElementById('orders-next').disabled = data.page >= data.last_page;
+        } else {
+          pag.style.display = 'none';
+        }
+
+        merchantOrdersLoaded = true;
+      } catch (e) {
+        document.getElementById('orders-loading').style.display = 'none';
+        document.getElementById('orders-error-msg').textContent = 'حدث خطأ أثناء التحميل';
+        document.getElementById('orders-error').style.display = '';
+        if (sub) sub.textContent = 'تعذّر تحميل الطلبات';
       }
     }
   </script>
@@ -5009,6 +4949,34 @@
     return faqs;
   }
 
+  function escapeHtml(s) {
+    return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function renderFaqsFromConfig(faqs) {
+    const list = document.getElementById('faqList');
+    if (!list) return;
+    const rows = Array.isArray(faqs) && faqs.length
+      ? faqs
+      : [{ q: '', a: '' }];
+    list.innerHTML = rows.map((f) => `
+      <div class="faq-item" style="background:var(--bg);border:1px solid var(--border);border-radius:var(--r);padding:12px 14px;margin-bottom:10px;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+          <div style="flex:1;">
+            <div class="wa-form-group" style="margin-bottom:8px;">
+              <label class="wa-label" style="font-size:0.7rem;">❓ السؤال</label>
+              <input class="wa-input" style="padding:6px 10px;" value="${escapeHtml(f.q)}" />
+            </div>
+            <div class="wa-form-group" style="margin-bottom:0;">
+              <label class="wa-label" style="font-size:0.7rem;">💬 الجواب</label>
+              <textarea class="wa-input" style="min-height:50px;padding:6px 10px;">${escapeHtml(f.a)}</textarea>
+            </div>
+          </div>
+          <button onclick="this.closest('.faq-item').remove()" style="background:var(--red-bg);border:1px solid rgba(239,68,68,0.2);border-radius:6px;padding:4px 8px;color:var(--red);cursor:pointer;font-size:0.75rem;flex-shrink:0;">✕</button>
+        </div>
+      </div>`).join('');
+  }
+
   // Load saved config into form on page load
   async function loadBotConfig() {
     try {
@@ -5018,6 +4986,9 @@
       if (cfg.store_training)  document.getElementById('ai_store_training').value = cfg.store_training;
       if (cfg.store_desc && !cfg.store_training) document.getElementById('ai_store_training').value = cfg.store_desc;
       if (cfg.support_phone)   document.getElementById('ai_support_phone').value = cfg.support_phone;
+      if (cfg.notify_phone)    document.getElementById('notify_phone').value = cfg.notify_phone;
+      const togNotify = document.getElementById('tog_notify_orders');
+      if (togNotify) { togNotify.className = 'toggle ' + (cfg.notify_orders ? 'on' : 'off'); }
       if (cfg.reply_with_name  === false) document.getElementById('tog_reply_name')?.classList.replace('on','off');
       if (cfg.stop_on_manual   === false) document.getElementById('tog_stop_manual')?.classList.replace('on','off');
       if (cfg.link_products    === false) document.getElementById('tog_link_products')?.classList.replace('on','off');
@@ -5030,6 +5001,13 @@
       if (cfg.msg_order_shipped)   document.getElementById('msg_order_shipped').value   = cfg.msg_order_shipped;
       if (cfg.msg_order_delivered) document.getElementById('msg_order_delivered').value = cfg.msg_order_delivered;
       if (cfg.msg_order_canceled)  document.getElementById('msg_order_canceled').value  = cfg.msg_order_canceled;
+      if (cfg.msg_cod)             document.getElementById('msg_cod').value              = cfg.msg_cod;
+      if (cfg.cod_enabled)         document.getElementById('tog_cod_enabled')?.classList.replace('off','on');
+      if (Array.isArray(cfg.faqs)) {
+        renderFaqsFromConfig(cfg.faqs);
+      }
+      const wph = document.getElementById('tpl_widget_phone');
+      if (wph && (cfg.support_phone || window.WZ_STORE_PHONE)) wph.value = cfg.support_phone || window.WZ_STORE_PHONE || '';
     } catch(e) {}
   }
   loadBotConfig();
@@ -5071,6 +5049,8 @@
     const payload = {
       store_training:      document.getElementById('ai_store_training')?.value || '',
       support_phone:       document.getElementById('ai_support_phone')?.value || '',
+      notify_phone:        document.getElementById('notify_phone')?.value || '',
+      notify_orders:       document.getElementById('tog_notify_orders')?.classList.contains('on'),
       reply_with_name:     document.getElementById('tog_reply_name')?.classList.contains('on'),
       stop_on_manual:      document.getElementById('tog_stop_manual')?.classList.contains('on'),
       manual_resume_after: parseInt(document.getElementById('manual_resume_after')?.value) || 30,
@@ -5089,6 +5069,11 @@
         body: JSON.stringify(payload),
       });
       if (res.ok) {
+        if (!payload.stop_on_manual) {
+          fetch('/whatsapp/manual-resume-all', { method: 'POST', headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content } })
+            .then(() => loadPausedContacts()).catch(() => {});
+        }
+        loadBotConfig();
         const alert = document.getElementById('aiSavedAlert');
         alert.style.display = 'flex';
         setTimeout(() => { alert.style.display = 'none'; }, 3500);

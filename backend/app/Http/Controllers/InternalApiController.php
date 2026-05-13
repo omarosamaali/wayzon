@@ -6,108 +6,133 @@ use App\Models\Order;
 use App\Models\SallaStore;
 use App\Models\User;
 use App\Services\SallaTokenService;
+use App\Support\SallaOrderPresenter;
+use App\Support\SallaProductPresenter;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Http;
 
 class InternalApiController extends Controller
 {
     public function orderStatus(Request $request)
     {
-        // Simple secret key check
         $secret = config('services.internal.secret', 'wyns-internal-2024');
         if ($request->header('X-Internal-Secret') !== $secret) {
             return response()->json(['error' => 'Unauthorized'], 401);
         }
 
         $tenantId = $request->query('tenant_id');
-        $search   = trim($request->query('order_id', ''));
+        $search   = trim((string) $request->query('order_id', ''));
 
-        if (!$tenantId || !$search) {
+        if (! $tenantId || $search === '') {
             return response()->json(['found' => false, 'error' => 'missing params'], 400);
         }
 
-        // Search by reference_id or salla_order_id
+        $store = SallaStore::where('user_id', $tenantId)->first();
+
+        if ($store?->access_token) {
+            try {
+                $sallaOrder = $this->fetchSallaOrderPayload($store, $tenantId, $search);
+                if (is_array($sallaOrder) && $sallaOrder !== []) {
+                    $slug = SallaOrderPresenter::statusSlugFromOrder($sallaOrder);
+
+                    return response()->json([
+                        'found'         => true,
+                        'order_id'      => (string) ($sallaOrder['reference_id'] ?? $sallaOrder['id'] ?? $search),
+                        'customer_name' => trim(($sallaOrder['customer']['first_name'] ?? '').' '.($sallaOrder['customer']['last_name'] ?? '')),
+                        'status'        => $slug,
+                        'status_label'  => SallaOrderPresenter::statusLabelFromOrder($sallaOrder),
+                        'total'         => SallaOrderPresenter::orderTotalFromPayload($sallaOrder),
+                    ]);
+                }
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::error('orderStatus Salla: '.$e->getMessage());
+            }
+        }
+
         $order = Order::where('user_id', $tenantId)
             ->where(function ($q) use ($search) {
                 $q->where('reference_id', $search)
-                  ->orWhere('salla_order_id', $search);
+                    ->orWhere('salla_order_id', $search);
             })
             ->latest()
             ->first();
 
-        $statusMap = [
-            'new'                => 'جديد 🆕',
-            'in_progress'        => 'قيد التنفيذ 🔄',
-            'under_review'       => 'بانتظار المراجعة ⏳',
-            'pending_review'     => 'بانتظار المراجعة ⏳',
-            'pending_payment'    => 'بانتظار الدفع 💳',
-            'paid'               => 'تم الدفع ✅',
-            'payment_confirmed'  => 'تم الدفع ✅',
-            'shipped'            => 'تم الشحن 🚚',
-            'delivering'         => 'جاري التوصيل 🛵',
-            'out_for_delivery'   => 'جاري التوصيل 🛵',
-            'delivered'          => 'تم التوصيل 🎉',
-            'canceled'           => 'ملغي ❌',
-            'returned'           => 'مسترجع 🔁',
-            'refunded'           => 'مسترجع 🔁',
-            'under_return'       => 'قيد الاسترجاع 🔄',
-            'return_in_progress' => 'قيد الاسترجاع 🔄',
-            'pending_quote'      => 'بانتظار عرض سعر 📋',
-            'pending_quotation'  => 'بانتظار عرض سعر 📋',
-        ];
-
-        if ($order) {
-            return response()->json([
-                'found'         => true,
-                'order_id'      => $order->reference_id ?: $order->salla_order_id,
-                'customer_name' => $order->customer_name,
-                'status'        => $order->status,
-                'status_label'  => $statusMap[$order->status] ?? $order->status,
-                'total'         => $order->total,
-            ]);
-        }
-
-        // Order not in DB — fetch directly from Salla API
-        $store = SallaStore::where('user_id', $tenantId)->first();
-        if (!$store) {
+        if (! $order) {
             return response()->json(['found' => false]);
         }
 
-        try {
-            $token    = (new SallaTokenService())->getValidToken($store);
-            $response = \Illuminate\Support\Facades\Http::withToken($token)
-                ->timeout(8)
-                ->get("https://api.salla.dev/admin/v2/orders/{$search}");
+        $payload = is_array($order->raw_payload) ? $order->raw_payload : [];
+        $fromApi = SallaOrderPresenter::orderTotalFromPayload($payload);
+        $total   = $fromApi > 0 ? $fromApi : (float) $order->total;
+        $slug    = $payload !== [] ? SallaOrderPresenter::statusSlugFromOrder($payload) : $order->status;
+        $label   = $payload !== [] ? SallaOrderPresenter::statusLabelFromOrder($payload) : SallaOrderPresenter::arabicStatusFromSlug((string) $order->status);
 
-            if (!$response->successful()) {
-                // Try searching by reference_id
-                $response = \Illuminate\Support\Facades\Http::withToken($token)
-                    ->timeout(8)
-                    ->get('https://api.salla.dev/admin/v2/orders', ['reference_id' => $search]);
+        return response()->json([
+            'found'         => true,
+            'order_id'      => $order->reference_id ?: $order->salla_order_id,
+            'customer_name' => $order->customer_name,
+            'status'        => $slug,
+            'status_label'  => $label,
+            'total'         => $total,
+        ]);
+    }
 
-                $items = $response->json('data', []);
-                $sallaOrder = $items[0] ?? null;
-            } else {
-                $sallaOrder = $response->json('data');
+    /**
+     * Live order JSON from Salla (preferred over local DB for totals / Arabic status).
+     */
+    private function fetchSallaOrderPayload(SallaStore $store, mixed $tenantId, string $search): ?array
+    {
+        $token = (new SallaTokenService())->getValidToken($store);
+
+        $response = Http::withToken($token)->timeout(12)->get('https://api.salla.dev/admin/v2/orders', [
+            'reference_id' => $search,
+            'per_page'     => 10,
+        ]);
+        if ($response->successful()) {
+            $items = $response->json('data', []);
+            foreach ($items as $row) {
+                if (! is_array($row)) {
+                    continue;
+                }
+                $ref = (string) ($row['reference_id'] ?? '');
+                if ($ref === $search || $ref === ltrim($search, '#')) {
+                    return $row;
+                }
             }
-
-            if (!$sallaOrder) {
-                return response()->json(['found' => false]);
+            if (! empty($items[0]) && is_array($items[0])) {
+                return $items[0];
             }
-
-            $status = $sallaOrder['status']['slug'] ?? 'unknown';
-
-            return response()->json([
-                'found'         => true,
-                'order_id'      => $sallaOrder['reference_id'] ?? $sallaOrder['id'],
-                'customer_name' => trim(($sallaOrder['customer']['first_name'] ?? '') . ' ' . ($sallaOrder['customer']['last_name'] ?? '')),
-                'status'        => $status,
-                'status_label'  => $statusMap[$status] ?? $status,
-                'total'         => $sallaOrder['amounts']['total']['amount'] ?? 0,
-            ]);
-        } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::error('orderStatus Salla fallback: ' . $e->getMessage());
-            return response()->json(['found' => false]);
         }
+
+        if (ctype_digit($search)) {
+            $response = Http::withToken($token)->timeout(12)->get("https://api.salla.dev/admin/v2/orders/{$search}");
+            if ($response->successful()) {
+                $data = $response->json('data');
+                if (is_array($data) && $data !== []) {
+                    return $data;
+                }
+            }
+        }
+
+        $order = Order::where('user_id', $tenantId)
+            ->where(function ($q) use ($search) {
+                $q->where('reference_id', $search)->orWhere('salla_order_id', $search);
+            })
+            ->whereNotNull('salla_order_id')
+            ->latest()
+            ->first();
+
+        if ($order && $order->salla_order_id !== '') {
+            $response = Http::withToken($token)->timeout(12)->get('https://api.salla.dev/admin/v2/orders/'.$order->salla_order_id);
+            if ($response->successful()) {
+                $data = $response->json('data');
+                if (is_array($data) && $data !== []) {
+                    return $data;
+                }
+            }
+        }
+
+        return null;
     }
 
     public function productSearch(Request $request)
@@ -118,44 +143,81 @@ class InternalApiController extends Controller
         }
 
         $tenantId = $request->query('tenant_id');
-        $query    = trim($request->query('q', ''));
+        $query     = trim($request->query('q', ''));
+        $catalog   = filter_var($request->query('catalog', false), FILTER_VALIDATE_BOOLEAN);
 
-        if (!$tenantId || !$query) {
+        if (! $tenantId) {
             return response()->json(['found' => false, 'error' => 'missing params'], 400);
         }
 
         $store = SallaStore::where('user_id', $tenantId)->first();
-        if (!$store || !$store->access_token) {
+        if (! $store || ! $store->access_token) {
             return response()->json(['found' => false, 'error' => 'no store']);
         }
 
         $token = (new SallaTokenService())->getValidToken($store);
 
-        try {
-            $response = \Illuminate\Support\Facades\Http::withToken($token)
-                ->timeout(8)
-                ->get('https://api.salla.dev/admin/v2/products', ['search' => $query, 'per_page' => 5]);
+        $clean = preg_replace('/\s+/u', ' ', $query);
+        $clean = trim((string) preg_replace(
+            '/\s*(ويش|وش|ايش|شنو|عندكم|عندك|بكم|بكام|السعر|سعر|منتجات?|متوفرة?|تتوفر|متوفر|موجود|الأسعار|اسعار|ر\s*يال|ر\s*\.?\s*س|ريال|طلب|عرض|كتالوج|قائمة)\s*/iu',
+            ' ',
+            $clean
+        ));
 
-            if (!$response->successful()) {
+        $useCatalog = $catalog
+            || mb_strlen($clean) < 2
+            || mb_strlen($query) > 140
+            || (bool) preg_match('/^(عندكم|وش\s*عندكم|ايش\s*عندكم|شنو\s*عندكم|منتجات|عرض\s*المنتجات|كل\s*المنتجات)/iu', $query);
+
+        try {
+            if ($useCatalog) {
+                $response = \Illuminate\Support\Facades\Http::withToken($token)
+                    ->timeout(12)
+                    ->get('https://api.salla.dev/admin/v2/products', [
+                        'per_page' => 8,
+                        'page'     => 1,
+                    ]);
+            } else {
+                $response = \Illuminate\Support\Facades\Http::withToken($token)
+                    ->timeout(12)
+                    ->get('https://api.salla.dev/admin/v2/products', [
+                        'search'   => mb_substr($clean, 0, 80),
+                        'per_page' => 8,
+                        'page'     => 1,
+                    ]);
+            }
+
+            if (! $response->successful()) {
                 return response()->json(['found' => false]);
             }
 
             $items = $response->json('data', []);
-            if (empty($items)) {
+            if ($items === []) {
                 return response()->json(['found' => false]);
             }
 
-            $products = collect($items)->map(fn($p) => [
-                'name'  => $p['name'] ?? '',
-                'price' => $p['price']['amount'] ?? ($p['regular_price']['amount'] ?? null),
-                'url'   => $p['url'] ?? null,
-                'sku'   => $p['sku'] ?? null,
-                'stock' => $p['quantity'] ?? null,
-            ])->filter(fn($p) => $p['name'])->values();
+            $products = collect($items)->map(function ($p) {
+                $priceRaw = $p['price'] ?? $p['regular_price'] ?? null;
+                $price = is_array($priceRaw)
+                    ? ($priceRaw['amount'] ?? $priceRaw['min']['amount'] ?? null)
+                    : $priceRaw;
+                $avail = SallaProductPresenter::availability($p);
+
+                return [
+                    'name'      => $p['name'] ?? '',
+                    'price'     => $price ? (float) $price : null,
+                    'url'       => $p['url'] ?? null,
+                    'sku'       => $p['sku'] ?? null,
+                    'stock'     => $avail['quantity'],
+                    'unlimited' => $avail['unlimited'],
+                    'in_stock'  => $avail['in_stock'],
+                ];
+            })->filter(fn ($p) => $p['name'])->values();
 
             return response()->json(['found' => true, 'products' => $products]);
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::error('productSearch error: ' . $e->getMessage());
+            \Illuminate\Support\Facades\Log::error('productSearch error: '.$e->getMessage());
+
             return response()->json(['found' => false]);
         }
     }

@@ -186,11 +186,7 @@
         <div class="plan-feat"><span class="fi fi-n">—</span> ردود ذكية بالذكاء الاصطناعي</div>
         <div class="plan-feat"><span class="fi fi-n">—</span> سيناريوهات الرد (Flows)</div>
       </div>
-      <form method="POST" action="{{ route('plan.change') }}">
-        @csrf
-        <input type="hidden" name="plan" value="basic">
-        <button type="submit" class="plan-btn plan-btn-upgrade" style="background:rgba(255,255,255,0.07);color:#f0f4ff;box-shadow:none;">الاشتراك في هذه الخطة</button>
-      </form>
+      <a href="https://apps.salla.sa/ar/app/1819242470" target="_blank" class="plan-btn plan-btn-upgrade" style="background:rgba(255,255,255,0.07);color:#f0f4ff;box-shadow:none;display:block;text-align:center;text-decoration:none;">الاشتراك في هذه الخطة</a>
     </div>
 
     {{-- SMART --}}
@@ -208,11 +204,7 @@
         <div class="plan-feat"><span class="fi fi-s">✦</span> تدريب بيانات المتجر</div>
         <div class="plan-feat"><span class="fi fi-n">—</span> سيناريوهات الرد (Flows)</div>
       </div>
-      <form method="POST" action="{{ route('plan.change') }}">
-        @csrf
-        <input type="hidden" name="plan" value="smart">
-        <button type="submit" class="plan-btn plan-btn-upgrade">اشترك الآن ←</button>
-      </form>
+      <a href="https://apps.salla.sa/ar/app/1819242470" target="_blank" class="plan-btn plan-btn-upgrade" style="display:block;text-align:center;text-decoration:none;">اشترك الآن ←</a>
     </div>
 
     {{-- PRO --}}
@@ -228,11 +220,7 @@
         <div class="plan-feat"><span class="fi" style="background:rgba(168,85,247,0.18);color:#d8b4fe;">◆</span> أولوية في الأداء والردود</div>
         <div class="plan-feat"><span class="fi" style="background:rgba(168,85,247,0.18);color:#d8b4fe;">◆</span> تحديثات مستقبلية</div>
       </div>
-      <form method="POST" action="{{ route('plan.change') }}">
-        @csrf
-        <input type="hidden" name="plan" value="pro">
-        <button type="submit" class="plan-btn plan-btn-pro">اشترك الآن ←</button>
-      </form>
+      <a href="https://apps.salla.sa/ar/app/1819242470" target="_blank" class="plan-btn plan-btn-pro" style="display:block;text-align:center;text-decoration:none;">اشترك الآن ←</a>
     </div>
 
   </div>
